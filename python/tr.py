@@ -141,7 +141,7 @@ def policy_rule_create(rule_num):
     prule.create_rule_cmd(src, dst, action, queue_num) 
     policy_db[rule_num] = request.get_json() 
 
-    return jsonify(policy_db), 201 
+    return jsonify({'result':policy_db[rule_num]}), 201 
 
 
 

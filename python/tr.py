@@ -1,10 +1,11 @@
 import os 
 import time 
 import iptc
-import json 
 
 from flask import Flask 
 from flask import request 
+from flask import jsonify 
+from flask import make_response 
 
 class policy_rule(object):
     '''
@@ -31,7 +32,7 @@ class policy_rule(object):
         return 
 
 
-    def create_rule(self, src, dst, action, qnum = 1):
+    def delete_rule(self, src, dst, action, qnum = 1):
          
         rule = iptc.Rule()
         target = iptc.Target(rule, action)
@@ -107,6 +108,12 @@ prule = policy_rule()
 @app.route("/")
 def hello():
     return "Hello World!"
+
+
+@app.errorhandler(404)
+def not_found(error): 
+    return make_response(jsonify({'error':'Not Found'}), 404) 
+
 
 @app.route('/policy/rule/<int:rule_num>', \
            methods = ['GET', 'POST', 'DELETE'])

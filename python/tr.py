@@ -1,6 +1,7 @@
 import os 
 import time 
 import iptc
+import json 
 
 from flask import Flask 
 from flask import request 
@@ -113,9 +114,17 @@ def handle_policy_rule(rule_num):
     print 'policy num %s ' % rule_num 
     print 'request method is %s ' % request.method 
 
-    data = request.get_json() 
+    print 'AB1 the request json data is %s ' % request.data
 
-    app.logger.debug('Info %s ' % data)
+    data = request.data
+    print 'iAB2 the request json data is %s ' % data 
+    #dataDict = json.loads(data)
+    json.dumps(data)
+
+
+    #app.logger.debug('Info %s ' % data)
+
+
     if request.method == 'POST': 
         print 'handling post'
     elif request.method == 'DELETE': 

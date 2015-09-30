@@ -7,6 +7,8 @@ from flask import request
 from flask import jsonify 
 from flask import make_response 
 
+policy_db = dict() 
+
 class policy_rule(object):
     '''
       class to manipulate policy rules 
@@ -48,7 +50,8 @@ class policy_rule(object):
         return 
 
      
-    def create_rule_cmd(self, src, dst, action, qnum = 1):
+    def create_rule_cmd(self, src, dst, action, qnum = 1, 
+                        position = 1):
 
         '''
         rule = iptc.Rule()
@@ -112,12 +115,41 @@ def hello():
 
 @app.errorhandler(404)
 def not_found(error): 
-    return make_response(jsonify({'error':'Not Found'}), 404) 
+    return make_response(
+            jsonify({'error':'Not Found'}), 
+                    404) 
 
 
-@app.route('/policy/rule/<int:rule_num>', \
-           methods = ['GET', 'POST', 'DELETE'])
-def handle_policy_rule(rule_num): 
+@app.route('/policy/rules/<int:rule_num>', \
+           methods = ['POST'])
+def policy_rule_create(rule_num): 
+    if not request.json: 
+        abort(400)
+
+    print 'policy num %s ' % rule_num 
+    print 'request method is %s ' % request.method 
+
+    print 'AB1 the request json data is %s ' % request.data
+
+
+    #app.logger.debug('Info %s ' % data)
+    src = request.json.get('src', '192.168.1.1') 
+    dst = request.json.get('dst', '192.168.2.1')
+    action = request.json.get('action', 'ACCEPT')
+    queue_num = request.json.get('queue_num', 0)
+
+    policy_db[rule_num] = request.get_json() 
+
+    return jsonify(policy_db), 201 
+
+
+
+@app.route('/policy/rules/<int:rule_num>', \
+           methods = ['DELETE'])
+def policy_rule_delete(rule_num): 
+    if not request.json: 
+        abort(400)
+
     print 'policy num %s ' % rule_num 
     print 'request method is %s ' % request.method 
 
@@ -130,18 +162,31 @@ def handle_policy_rule(rule_num):
 
 
     #app.logger.debug('Info %s ' % data)
+    src = request.json.get('src', '192.168.1.1') 
+    dst = request.json.get('dst', '192.168.2.1')
+    action = request.json.get('action', 'ACCEPT')
+    queue_num = request.json.get('queue_num', 0)
+
+    policy_db.pop(rule_num, None)
+
+    return jsonify(policy_db), 201 
 
 
-    if request.method == 'POST': 
-        print 'handling post'
-    elif request.method == 'DELETE': 
-        print 'handling deletion'
-    else:
-        print 'handling get'
-
-    return 'request method is %s %s ' % (request.method, rule_num)
+@app.route('/policy/rules', methods = ['GET'])
+def policy_rule_get_all(): 
+    return jsonify(policy_db) 
 
 
+
+@app.route('/policy/rules/<int:rule_num>', \
+           methods = ['GET'])
+def policy_rule_get_one(rule_num): 
+    rule = [ v for k, v in policy_db.iteritems() \
+                if k == rule_num]
+
+    print str(rule) 
+
+    return jsonify({'result':rule}) 
 
 
 

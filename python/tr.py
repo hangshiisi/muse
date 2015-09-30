@@ -138,6 +138,7 @@ def policy_rule_create(rule_num):
     action = request.json.get('action', 'ACCEPT')
     queue_num = request.json.get('queue_num', 0)
 
+    prule.create_rule_cmd(src, dst, action, queue_num) 
     policy_db[rule_num] = request.get_json() 
 
     return jsonify(policy_db), 201 
@@ -155,11 +156,6 @@ def policy_rule_delete(rule_num):
 
     print 'AB1 the request json data is %s ' % request.data
 
-    data = request.data
-    print 'iAB2 the request json data is %s ' % data 
-    #dataDict = json.loads(data)
-    json.dumps(data)
-
 
     #app.logger.debug('Info %s ' % data)
     src = request.json.get('src', '192.168.1.1') 
@@ -168,6 +164,7 @@ def policy_rule_delete(rule_num):
     queue_num = request.json.get('queue_num', 0)
 
     policy_db.pop(rule_num, None)
+    prule.delete_rule_cmd(src, dst, action, queue_num) 
 
     return jsonify(policy_db), 201 
 

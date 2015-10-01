@@ -1,5 +1,7 @@
 import time
 from thread2 import Thread 
+from ctypes import * 
+
 
 def f(): 
     try: 
@@ -8,12 +10,12 @@ def f():
     finally: 
         print "outta here" 
 
-#t = Thread(target = f) 
-#t.start()
-#t.isAlive()
+t = Thread(target = f) 
+t.start()
+t.isAlive()
 
-#t.terminate()
-#t.join()
-#t.isAlive()
+t.terminate()
+t.join()
+t.isAlive()
 
 

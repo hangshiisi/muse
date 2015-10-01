@@ -54,6 +54,7 @@ class NFQueue(threading.Thread):
     _event_stop = None 
 
     def __init__(self, queues): 
+        threading.Thread.__init__(self) 
         self._queues = queues
         self._nfqueue = NetfilterQueue() 
         self._event_stop = threading.Event()
@@ -79,25 +80,24 @@ class NFQueue(threading.Thread):
         #   pkt.accept()
 
     def run(self): 
-        for i in queues: 
-            self._nfqueue.bind(i, curry(handle_pkt, i))
+        for i in self._queues: 
+            self._nfqueue.bind(i, curry(self.handle_pkt, i))
 
         try: 
             self._nfqueue.run()
         except ValueError: 
             print "Completed New Configuration Comes In" 
             pass 
-        except KeyboardInterrupt: 
-            print 
       
     def cleanup(self): 
-        for i in queues: 
+        for i in self._queues: 
             self._nfqueue.unbind()
 
     def stop(self): 
         self._event_stop.set() 
-        self.cleanup() 
-        raise ValueError('New Configuration Comes In') 
+        self.cleanup()
+
+        #raise ValueError('New Configuration Comes In') 
 
     def __call__(self): 
         run()
@@ -112,14 +112,14 @@ class TCManager(object):
     def service_restart(self): 
         for i in self._queues: 
             print "queue number %s" % i 
-        if _nfq_thread: 
+        if self._nfq_thread: 
             #need to call stop thread function 
-            _nfq_thread.stop()
+            self._nfq_thread.stop()
+            self._nfq_thread._Thread_stop()
             print "stopped a thread " 
-        self._nfq_thread = NFQueue()
+        self._nfq_thread = NFQueue(self._queues)
         print "creating a thread" 
         self._nfq_thread.start() 
-
 
     def add_queue(self, queue_num): 
         self._queues.append(queue_num)

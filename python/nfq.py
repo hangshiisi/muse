@@ -1,8 +1,11 @@
 import nfqueue
 from scapy.all import *
 import os
-domain = 'facebook.com'
-os.system('iptables -A OUTPUT -p udp --dport 53 -j NFQUEUE')
+
+from curry import *
+
+
+
 def callback(payload):
     data = payload.get_data()
     pkt = IP(data)

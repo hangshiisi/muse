@@ -34,15 +34,15 @@ class NFQueue(multiprocessing.Process):
         print 'Getting a packet ' 
 
         o_pkt = IP(pkt.get_payload()) 
-        o_pkt.show()
         m = MPLS(label=0x9, cos = 0x3) 
         #new_pkt = IP(dst=o_pkt[IP].dst, src=o_pkt[IP].src, \
         #              proto=o_pkt[IP].proto,\
         #             tos=o_pkt[IP].tos)/m/pkt.get_payload()
         #new_pkt = o_pkt/Raw('Hello World')
-        new_pkt = o_pkt/Raw(pkt.get_payload())
+        new_pkt = o_pkt/Raw('FFFFFF'+ pkt.get_payload())
         #new_pkt = o_pkt/ICMP()
         send(new_pkt)
+        new_pkt.show()
 
         pkt.drop()
         #   pkt.accept()

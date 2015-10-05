@@ -1,6 +1,7 @@
 import os 
 import time 
 import iptc
+import thread 
 
 from flask import Flask 
 from flask import request 
@@ -185,11 +186,18 @@ def policy_rule_get_one(rule_num):
 
     return jsonify({'result':rule}) 
 
+def start_web_server(): 
+    app.run(debug=True, use_reloader=False)
+
 
 
 if __name__ == "__main__":
-    app.debug = True 
-    app.run(host='0.0.0.0')
+    thread.start_new_thread(start_web_server, ())
+    print "Hello world after app.run"
+    while True: 
+        time.sleep(1)
+        pass
+
 
 
 

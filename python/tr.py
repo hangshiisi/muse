@@ -187,7 +187,7 @@ def policy_rule_get_one(rule_num):
     return jsonify({'result':rule}) 
 
 def start_web_server(): 
-    app.run(debug=True, use_reloader=False)
+    app.run(debug=True, use_reloader=False, host='0.0.0.0')
 
 
 

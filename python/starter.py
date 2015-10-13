@@ -1,3 +1,7 @@
+#!/usr/bin/env python 
+
+
+
 import os 
 import time 
 import iptc
@@ -174,6 +178,10 @@ def policy_rule_delete(rule_num):
 def policy_rule_get_all(): 
     return jsonify(policy_db) 
 
+def policy_flush_rules(): 
+    os.system('iptables -F -t nat')
+    os.system('iptables -F -t filter') 
+
 
 
 @app.route('/policy/rules/<int:rule_num>', \
@@ -193,6 +201,7 @@ def start_web_server():
 
 if __name__ == "__main__":
     thread.start_new_thread(start_web_server, ())
+    time.sleep(2)
     print "Hello world after app.run"
     while True: 
         time.sleep(1)

@@ -1,11 +1,10 @@
 #!/usr/bin/env python 
 
-
-
 import os 
 import time 
 import iptc
 import thread 
+import cmd 
 
 from flask import Flask 
 from flask import request 
@@ -34,7 +33,7 @@ class policy_rule(object):
         rule.src = src
         rule.dst = dst 
     
-        chain = iptc.Chain(iptc.Table(iptc.Table.FILTER), "INPUT")
+        chain = iptc.Chain(iptc.Table(iptc.Table.FILTER), "FORWARD")
         chain.insert_rule(rule) 
         return 
 
@@ -50,7 +49,7 @@ class policy_rule(object):
         rule.src = src
         rule.dst = dst 
     
-        chain = iptc.Chain(iptc.Table(iptc.Table.FILTER), "INPUT")
+        chain = iptc.Chain(iptc.Table(iptc.Table.FILTER), "FORWARD")
         chain.delete_rule(rule) 
         return 
 
@@ -63,13 +62,13 @@ class policy_rule(object):
         rule.protocol = "tcp" 
         rule.target = iptc.Target(rule, "DROP")
         match = iptc.Match(rule, "state")
-        chain = iptc.Chain(iptc.Table(iptc.Table.FILTER), "INPUT")
+        chain = iptc.Chain(iptc.Table(iptc.Table.FILTER), "FORWARD")
         match.state = "RELATED,ESTABLISHED"
         rule.add_match(match)
         chain.insert_rule(rule) 
         '''
          
-        cmd = 'sudo iptables -A INPUT '
+        cmd = 'sudo iptables -A FORWARD '
 
         cmd += '--src ' + src + ' ' 
         cmd += '--dst ' + dst + ' '
@@ -82,7 +81,7 @@ class policy_rule(object):
         return  
 
     def delete_rule_cmd(self, src, dst, action, qnum = 1):
-        cmd = 'sudo iptables -D INPUT '
+        cmd = 'sudo iptables -D FORWARD '
 
         cmd += '--src ' + src + ' ' 
         cmd += '--dst ' + dst + ' '
@@ -109,6 +108,136 @@ def rule_manipulation():
     print "hello world ends" 
     return 
 
+class ShellEnabled(cmd.Cmd):
+
+    last_output = ''
+
+    def do_shell(self, line):
+        "Run a shell command"
+        print "running shell command:", line
+        output = os.popen(line).read()
+        print output
+        self.last_output = output
+
+    def do_echo(self, line):
+        """
+        Print the input, replacing '$out' with the output 
+        of the last shell command
+        """
+        # Obviously not robust
+        print line.replace('$out', self.last_output)
+
+    def do_create(self, rule):
+        """
+        Create Policy Rule
+        """
+        print "the line is " + rule  
+        l = rule.split() 
+        if len(l) < 1 or len(l) % 2 == 0: 
+            print "input needs to have odd number" 
+            return 
+
+        if l[0] != 'rule': 
+            print "only rule creation is supported " 
+            return 
+
+        # some default values 
+        src = '172.1.1.1'
+        dst = '172.1.2.1'
+        action = 'NFQUEUE'
+        queue_num = 2 
+       
+        for k,v in zip(l[1::2], l[2::2]): 
+            print "%s = %s " % (k, v) 
+            if k == 'src': 
+                src = v
+            elif k == 'dst':
+                dst = v
+            elif k == 'action': 
+                action = v
+            elif k == 'queue_num': 
+                queue_num = v 
+            else: 
+                print "unsupported parameter"
+                return 
+
+        prule = policy_rule() 
+        prule.create_rule_cmd(src, dst, action, queue_num) 
+
+    def do_delete(self, rule):
+        """
+        Delete Policy Rule
+        """
+        print "the line is " + rule  
+        l = rule.split() 
+        if len(l) < 1 or len(l) % 2 == 0: 
+            print "input needs to have odd number" 
+            return 
+
+        if l[0] != 'rule': 
+            print "only rule creation is supported " 
+            return 
+
+        # some default values 
+        src = '172.1.1.1'
+        dst = '172.1.2.1'
+        action = 'NFQUEUE'
+        queue_num = 2 
+       
+        for k,v in zip(l[1::2], l[2::2]): 
+            print "%s = %s " % (k, v) 
+            if k == 'src': 
+                src = v
+            elif k == 'dst':
+                dst = v
+            elif k == 'action': 
+                action = v
+            elif k == 'queue_num': 
+                queue_num = v 
+            else: 
+                print "unsupported parameter"
+                return 
+
+        prule = policy_rule() 
+        prule.delete_rule_cmd(src, dst, action, queue_num) 
+
+
+
+    def do_show(self, rule):
+        """
+        Show Policy Rule
+        """
+        print "the line is " + rule  
+        l = rule.split() 
+        if len(l) > 2: 
+            print "input needs to have one number" 
+            return 
+
+        if l[0] != 'rule': 
+            print "only rule display is supported " 
+            return 
+
+        cmd1 = 'iptables -L -n -v '
+        output = os.popen(cmd1).read()
+        print '#'*40
+        print output
+
+        cmd1 = 'iptables -t nat -L -n -v '
+        output = os.popen(cmd1).read()
+        print '#'*40
+        print output
+
+    def do_exit(self, line):
+        """
+        exit the application 
+        """
+        return True
+
+    def do_EOF(self, line):
+        """
+        Ctrl+D to exit
+        """
+        return True
 
 app = Flask(__name__)
 prule = policy_rule() 
@@ -195,17 +324,22 @@ def policy_rule_get_one(rule_num):
     return jsonify({'result':rule}) 
 
 def start_web_server(): 
-    app.run(debug=True, use_reloader=False, host='0.0.0.0')
+    app.run(debug=False, use_reloader=False, host='0.0.0.0')
 
 
 
 if __name__ == "__main__":
+    print "Starting Services and Shell, please wait"
     thread.start_new_thread(start_web_server, ())
     time.sleep(2)
-    print "Hello world after app.run"
-    while True: 
-        time.sleep(1)
-        pass
+    print "Shell started"
+    print "Only limited commands are supported"
+
+    ShellEnabled().cmdloop() 
+
+# while True: 
+#        time.sleep(1)
+#        pass
 
 
 

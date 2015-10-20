@@ -80,8 +80,9 @@ class TCManager(object):
     def __init__(self): 
         #for line in traceback.format_stack(): 
         #    print line.strip() 
-
+	
         #logger.debug("TC Packet Manager Invoked")  
+        pass 
 
     def service_restart(self): 
         logger.debug("queue thread alive and number are %s, %s" %  

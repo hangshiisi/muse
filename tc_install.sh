@@ -52,9 +52,11 @@ apt-get install -y git
 apt-get install -y python-pip 
 apt-get install -y build-essential python-dev libnetfilter-queue-dev
 
-pip install --upgrade scapy Flask 
+pip install scapy  
+pip install Flask 
 
 pip install --upgrade python-iptables
 
+pip install NetfilterQueue
 
 

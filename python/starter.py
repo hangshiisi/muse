@@ -5,22 +5,32 @@ import time
 import iptc
 import thread 
 import cmd 
+import logging 
+
 
 from flask import Flask 
 from flask import request 
 from flask import jsonify 
 from flask import make_response 
 
-policy_db = dict() 
+from netf import TCManager
 
-class policy_rule(object):
+logging.basicConfig(level = logging.DEBUG,
+                    format = '(%(threadName)-10s) %(message)s',
+                    )
+
+policy_db = dict() 
+tc_mgr = TCManager() 
+
+class PolicyRule(object):
     '''
       class to manipulate policy rules 
     '''
 
-    def __init__(self): 
+    def __init__(self, tc_mgr=None): 
         self._name = None
         self._rule = None 
+        self._tc_mgr = tc_mgr
 
     def create_rule(self, src, dst, action, qnum = 1):
          
@@ -34,7 +44,10 @@ class policy_rule(object):
         rule.dst = dst 
     
         chain = iptc.Chain(iptc.Table(iptc.Table.FILTER), "FORWARD")
-        chain.insert_rule(rule) 
+        chain.insert_rule(rule)
+        if self._tc_mgr: 
+            self._tc_mgr.add_queue(int(qnum)) 
+ 
         return 
 
 
@@ -51,6 +64,8 @@ class policy_rule(object):
     
         chain = iptc.Chain(iptc.Table(iptc.Table.FILTER), "FORWARD")
         chain.delete_rule(rule) 
+        if self._tc_mgr: 
+            self._tc_mgr.remove_queue(int(qnum)) 
         return 
 
      
@@ -74,10 +89,15 @@ class policy_rule(object):
         cmd += '--dst ' + dst + ' '
 
         cmd += '-j NFQUEUE ' 
+	#print "type str is %s " % type(qnum) 
+
         cmd += '--queue-num ' + str(qnum) + ' '
 
         print "command is " + cmd 
         os.system(cmd) 
+        if self._tc_mgr: 
+            self._tc_mgr.add_queue(int(qnum)) 
+ 
         return  
 
     def delete_rule_cmd(self, src, dst, action, qnum = 1):
@@ -91,11 +111,13 @@ class policy_rule(object):
 
         print "command is " + cmd 
         os.system(cmd) 
+        if self._tc_mgr: 
+            self._tc_mgr.remove_queue(int(qnum)) 
         return 
 
 def rule_manipulation():
 
-    prule = policy_rule() 
+    prule = PolicyRule(tc_mgr) 
 
     prule.create_rule_cmd("172.1.1.1", "172.1.2.1", "NFQUEUE", 2) 
     #prule.create_rule("172.1.1.1", "172.1.2.1", "QUEUE", 2) 
@@ -118,6 +140,7 @@ class ShellEnabled(cmd.Cmd):
         output = os.popen(line).read()
         print output
         self.last_output = output
+        return 
 
     def do_echo(self, line):
         """
@@ -126,6 +149,7 @@ class ShellEnabled(cmd.Cmd):
         """
         # Obviously not robust
         print line.replace('$out', self.last_output)
+        return 
 
     def do_create(self, rule):
         """
@@ -161,8 +185,9 @@ class ShellEnabled(cmd.Cmd):
                 print "unsupported parameter"
                 return 
 
-        prule = policy_rule() 
+        prule = PolicyRule(tc_mgr) 
         prule.create_rule_cmd(src, dst, action, queue_num) 
+        return 
 
     def do_delete(self, rule):
         """
@@ -198,10 +223,9 @@ class ShellEnabled(cmd.Cmd):
                 print "unsupported parameter"
                 return 
 
-        prule = policy_rule() 
+        prule = PolicyRule(tc_mgr) 
         prule.delete_rule_cmd(src, dst, action, queue_num) 
-
-
+        return 
 
     def do_show(self, rule):
         """
@@ -226,6 +250,40 @@ class ShellEnabled(cmd.Cmd):
         output = os.popen(cmd1).read()
         print '#'*40
         print output
+        return 
+
+    def do_flush(self, line):
+        """
+        list the queues  
+        """
+        print "flushing the rules " + line  
+        l = line.split() 
+        if len(l) > 1: 
+            print "input needs to have one number" 
+            return 
+	policy_flush_rules() 
+	return 
+        
+    def do_queue(self, line):
+        """
+        list the queues  
+        """
+        print "the line is " + line  
+        l = line.split() 
+        if len(l) > 2: 
+            print "input needs to have one number" 
+            return 
+
+        if l[0] != 'list': 
+            print "only queue list is supported " 
+            return 
+
+	queues = tc_mgr.get_queue() 
+	print "queue numbers are: %s " % queues 
+	for q in queues: 
+	    print "queue %s details: %s" % (q, policy_db[str(q)]) 
+        return 
+       
 
     def do_exit(self, line):
         """
@@ -240,7 +298,6 @@ class ShellEnabled(cmd.Cmd):
         return True
 
 app = Flask(__name__)
-prule = policy_rule() 
 
 @app.route("/")
 def hello():
@@ -318,22 +375,21 @@ def policy_flush_rules():
 def policy_rule_get_one(rule_num): 
     rule = [ v for k, v in policy_db.iteritems() \
                 if k == rule_num]
-
     print str(rule) 
 
     return jsonify({'result':rule}) 
 
 def start_web_server(): 
-    app.run(debug=False, use_reloader=False, host='0.0.0.0')
+    app.run(debug=True, use_reloader=False, host='0.0.0.0')
 
 
 
 if __name__ == "__main__":
-    print "Starting Services and Shell, please wait"
+    logging.debug("Starting Services and Shell, please wait")
     thread.start_new_thread(start_web_server, ())
     time.sleep(2)
-    print "Shell started"
-    print "Only limited commands are supported"
+    logging.debug("Shell started")
+    logging.debug("Only limited commands are supported")
 
     ShellEnabled().cmdloop() 
 

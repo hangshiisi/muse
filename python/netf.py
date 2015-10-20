@@ -75,7 +75,7 @@ class TCManager(object):
     _nfq_thread = None  
 
     def __init__(self): 
-        pass 
+        logging.debug("TC Packet Manager Started" )  
 
     def service_restart(self): 
         logging.debug("queue thread alive and number are %s, %s" %  
@@ -106,11 +106,22 @@ class TCManager(object):
         #the changes effective 
         self.service_restart() 
 
+    def get_queue(self): 
+        #return queue info
+        return self._queues 
+
 if __name__ == "__main__":
     tc = TCManager()  
-    tc.add_queue(1) 
+if __name__ == "__main__":
+    tc = TCManager()  
+    tc.add_queue(900) 
+    tc.add_queue(900) 
     tc.add_queue(2) 
     tc.add_queue(3) 
+    tc.remove_queue(2) 
+
+    print "current queue is %s " % tc.get_queue()
+
     while True: 
         pass
 

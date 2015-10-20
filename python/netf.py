@@ -31,7 +31,6 @@ class NFQueue(multiprocessing.Process):
     def handle_pkt(self, queue, pkt): 
         logging.debug('Queue %s pkt len %s content %s' %
                        (queue, pkt.get_payload_len(), pkt)) 
-        print 'Getting a packet ' 
 
         o_pkt = IP(pkt.get_payload()) 
         m = MPLS(label=0x9, cos = 0x3) 
@@ -54,23 +53,22 @@ class NFQueue(multiprocessing.Process):
         try: 
             self._nfqueue.run()
         except ValueError: 
-            print "STOPPPED V Completed New Configuration Comes In" 
+            logging.debug("STOPPPED due to invalid configuration ")
             self.cleanup()
         except KeyboardInterrupt: 
-            print "STOPPPED K Completed New Configuration Comes In" 
+            logging.debug("STOPPPED due to user keyboard input ")  
             self.cleanup()
         except: 
-            print "OTHER STOPPPED Completed New Configuration Comes In" 
-            pass 
+            logging.debug("STOPPPED due to user keyboard input ")  
+            self.cleanup()
       
     def cleanup(self): 
-        print "inside clean up " 
+        logging.debug("packet handler cleaning up ") 
         self._nfqueue.unbind()
 
     def stop(self): 
-        print "done Got a stop signal here" 
+        logging.debug("packet handler stopped ") 
         self.cleanup()
-
 
 class TCManager(object): 
     _queues = []
@@ -80,23 +78,21 @@ class TCManager(object):
         pass 
 
     def service_restart(self): 
-        for i in self._queues: 
-            print "queue number %s" % i 
-        print self._nfq_thread
+        logging.debug("queue thread alive and number are %s, %s" %  
+                       (self._nfq_thread == None, self._queues))
         if self._nfq_thread: 
-           print self._nfq_thread.is_alive() 
+            logging.debug("previous queue aliveness %s ", 
+                        self._nfq_thread.is_alive()) 
 
         if self._nfq_thread and self._nfq_thread.is_alive(): 
             #need to call stop thread function 
-            print "stopped a thread " 
+            logging.debug("Updating packet handler with new configuration " )
             self._nfq_thread.terminate()
-            print "prepare to wait for join a thread " 
             self._nfq_thread.join()
-            print "done prepare to wait for join a thread " 
-        print "creating a thread" 
+        else: 
+            logging.debug("Creating packet handler with new configuration")
         self._nfq_thread = NFQueue(self._queues)
         self._nfq_thread.start() 
-        print "done creating a thread" 
 
     def add_queue(self, queue_num): 
         self._queues.append(queue_num)
@@ -104,14 +100,11 @@ class TCManager(object):
         #the changes effective 
         self.service_restart() 
 
-
     def remove_queue(self, queue_num): 
         self._queues.remove(queue_num) 
         #call service restart in order to make
         #the changes effective 
         self.service_restart() 
-
-
 
 if __name__ == "__main__":
     tc = TCManager()  

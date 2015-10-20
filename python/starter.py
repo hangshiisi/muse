@@ -15,9 +15,13 @@ from flask import make_response
 
 from netf import TCManager
 
-logging.basicConfig(level = logging.DEBUG,
-                    format = '(%(threadName)-10s) %(message)s',
-                    )
+
+logger = logging.getLogger('MuseTC') 
+hdlr = logging.FileHandler('/var/log/MuseTC.log') 
+formatter = logging.Formatter('%(asctime)s-%(levelname)s-(%(threadName)-10s) %(message)s')
+hdlr.setFormatter(formatter)
+logger.addHandler(hdlr)
+logger.setLevel(logging.DEBUG)
 
 policy_db = dict() 
 tc_mgr = TCManager() 
@@ -131,7 +135,7 @@ def rule_manipulation():
     return 
 
 class ShellEnabled(cmd.Cmd):
-
+    prompt = '(TC)'
     last_output = ''
 
     def do_shell(self, line):
@@ -263,7 +267,13 @@ class ShellEnabled(cmd.Cmd):
             return 
 	policy_flush_rules() 
 	return 
-        
+      
+    def emptyline(self): 
+        """
+        do nothing if no input
+        """
+        return 
+  
     def do_queue(self, line):
         """
         list the queues  
@@ -385,11 +395,10 @@ def start_web_server():
 
 
 if __name__ == "__main__":
-    logging.debug("Starting Services and Shell, please wait")
+    print("Starting Services and Shell, please wait...")
     thread.start_new_thread(start_web_server, ())
     time.sleep(2)
-    logging.debug("Shell started")
-    logging.debug("Only limited commands are supported")
+    print("Shell started, only limited commands are supported")
 
     ShellEnabled().cmdloop() 
 

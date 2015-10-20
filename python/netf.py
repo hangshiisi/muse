@@ -1,14 +1,17 @@
 from netfilterqueue import NetfilterQueue
 from scapy.all import * 
+from curry import curry 
 import os 
 import logging 
 import multiprocessing 
+import traceback 
 
-from curry import curry 
-
-logging.basicConfig(level = logging.DEBUG, 
-                    format = '(%(threadName)-10s) %(message)s', 
-                    ) 
+logger = logging.getLogger('MuseTC')
+hdlr = logging.FileHandler('/var/log/MuseTC.log')
+formatter = logging.Formatter('%(asctime)s-%(levelname)s-(%(threadName)-10s) %(message)s')
+hdlr.setFormatter(formatter)
+logger.addHandler(hdlr)
+logger.setLevel(logging.DEBUG)
 
 class MPLS(Packet): 
    name = "MPLS" 
@@ -29,7 +32,7 @@ class NFQueue(multiprocessing.Process):
         super(NFQueue, self).__init__()
 
     def handle_pkt(self, queue, pkt): 
-        logging.debug('Queue %s pkt len %s content %s' %
+        logger.debug('Queue %s pkt len %s content %s' %
                        (queue, pkt.get_payload_len(), pkt)) 
 
         o_pkt = IP(pkt.get_payload()) 
@@ -53,21 +56,21 @@ class NFQueue(multiprocessing.Process):
         try: 
             self._nfqueue.run()
         except ValueError: 
-            logging.debug("STOPPPED due to invalid configuration ")
+            logger.debug("STOPPPED due to invalid configuration ")
             self.cleanup()
         except KeyboardInterrupt: 
-            logging.debug("STOPPPED due to user keyboard input ")  
+            logger.debug("STOPPPED due to user keyboard input ")  
             self.cleanup()
         except: 
-            logging.debug("STOPPPED due to user keyboard input ")  
+            logger.debug("STOPPPED due to user keyboard input ")  
             self.cleanup()
       
     def cleanup(self): 
-        logging.debug("packet handler cleaning up ") 
+        logger.debug("packet handler cleaning up ") 
         self._nfqueue.unbind()
 
     def stop(self): 
-        logging.debug("packet handler stopped ") 
+        logger.debug("packet handler stopped ") 
         self.cleanup()
 
 class TCManager(object): 
@@ -75,26 +78,33 @@ class TCManager(object):
     _nfq_thread = None  
 
     def __init__(self): 
-        logging.debug("TC Packet Manager Started" )  
+        #for line in traceback.format_stack(): 
+        #    print line.strip() 
+
+        #logger.debug("TC Packet Manager Invoked")  
 
     def service_restart(self): 
-        logging.debug("queue thread alive and number are %s, %s" %  
+        logger.debug("queue thread alive and number are %s, %s" %  
                        (self._nfq_thread == None, self._queues))
         if self._nfq_thread: 
-            logging.debug("previous queue aliveness %s ", 
+            logger.debug("previous queue aliveness %s ", 
                         self._nfq_thread.is_alive()) 
 
         if self._nfq_thread and self._nfq_thread.is_alive(): 
             #need to call stop thread function 
-            logging.debug("Updating packet handler with new configuration " )
+            logger.debug("Updating packet handler with new configuration " )
             self._nfq_thread.terminate()
             self._nfq_thread.join()
         else: 
-            logging.debug("Creating packet handler with new configuration")
+            logger.debug("Creating packet handler with new configuration")
         self._nfq_thread = NFQueue(self._queues)
         self._nfq_thread.start() 
 
     def add_queue(self, queue_num): 
+        if queue_num in self._queues: 
+	    logger.debug("queue %s is already there" % queue_num) 
+	    return 
+
         self._queues.append(queue_num)
         #call service restart in order to make
         #the changes effective 
@@ -110,8 +120,6 @@ class TCManager(object):
         #return queue info
         return self._queues 
 
-if __name__ == "__main__":
-    tc = TCManager()  
 if __name__ == "__main__":
     tc = TCManager()  
     tc.add_queue(900) 

@@ -6,7 +6,8 @@ import iptc
 import thread 
 import cmd 
 import logging 
-
+import json 
+import sys 
 
 from flask import Flask 
 from flask import request 
@@ -16,9 +17,9 @@ from flask import make_response
 from netf import TCManager
 
 
-logger = logging.getLogger('MuseTC') 
+logger = logging.getLogger(__name__) 
 hdlr = logging.FileHandler('/var/log/MuseTC.log') 
-formatter = logging.Formatter('%(asctime)s-%(levelname)s-(%(threadName)-10s) %(message)s')
+formatter = logging.Formatter('%(asctime)s-%(name)s-%(levelname)s-(%(threadName)-10s) %(message)s')
 hdlr.setFormatter(formatter)
 logger.addHandler(hdlr)
 logger.setLevel(logging.DEBUG)
@@ -77,34 +78,43 @@ class PolicyRule(object):
                         position = 1):
 
         '''
-        rule = iptc.Rule()
-        rule.protocol = "tcp" 
-        rule.target = iptc.Target(rule, "DROP")
-        match = iptc.Match(rule, "state")
-        chain = iptc.Chain(iptc.Table(iptc.Table.FILTER), "FORWARD")
-        match.state = "RELATED,ESTABLISHED"
-        rule.add_match(match)
-        chain.insert_rule(rule) 
+        create netfilter/iptabels rules
+        if exists already, will exist rather overwrite 
         '''
-         
-        cmd = 'sudo iptables -A FORWARD '
+        if qnum in policy_db: 
+            logger.warn('entry with queue number %s already exists' %
+                        qnum) 
+            print('entry with queue number %s already exists' % qnum)
+            print(' ignored or delete before add') 
+            return 
+ 
+        cmd = 'sudo iptables -I FORWARD %s ' % str(qnum) 
 
+        data = {}
         cmd += '--src ' + src + ' ' 
         cmd += '--dst ' + dst + ' '
-
         cmd += '-j NFQUEUE ' 
-	#print "type str is %s " % type(qnum) 
-
         cmd += '--queue-num ' + str(qnum) + ' '
 
+        data['src'] = src
+        data['dst'] = dst
+        data['action'] = 'NFQUEUE'
+        data['queue-num'] = qnum 
+	policy_db[qnum] = json.dumps(data) 
+        
         print "command is " + cmd 
+        logging.info("Creating rule %s " % cmd)
         os.system(cmd) 
         if self._tc_mgr: 
             self._tc_mgr.add_queue(int(qnum)) 
- 
+         
         return  
 
     def delete_rule_cmd(self, src, dst, action, qnum = 1):
+        '''
+        delete iptables rule based on rule 
+        can be done via index as well
+        ''' 
         cmd = 'sudo iptables -D FORWARD '
 
         cmd += '--src ' + src + ' ' 
@@ -114,9 +124,20 @@ class PolicyRule(object):
         cmd += '--queue-num ' + str(qnum) + ' '
 
         print "command is " + cmd 
+        logging.info("Deleting rule %s " % cmd)
         os.system(cmd) 
         if self._tc_mgr: 
             self._tc_mgr.remove_queue(int(qnum)) 
+        policy_db.pop(rule_num, None)
+
+        return 
+
+    @staticmethod 
+    def delete_all_rules(self):
+        for index in policy_db: 
+            cmd = 'sudo iptables -D FORWARD %s ' % index 
+            logging.info("Deleting rule %s " % cmd)
+            os.system(cmd) 
         return 
 
 def rule_manipulation():
@@ -159,7 +180,7 @@ class ShellEnabled(cmd.Cmd):
         """
         Create Policy Rule
         """
-        print "the line is " + rule  
+        #print "the line is " + rule  
         l = rule.split() 
         if len(l) < 1 or len(l) % 2 == 0: 
             print "input needs to have odd number" 
@@ -176,7 +197,7 @@ class ShellEnabled(cmd.Cmd):
         queue_num = 2 
        
         for k,v in zip(l[1::2], l[2::2]): 
-            print "%s = %s " % (k, v) 
+            #print "%s = %s " % (k, v) 
             if k == 'src': 
                 src = v
             elif k == 'dst':
@@ -247,12 +268,12 @@ class ShellEnabled(cmd.Cmd):
 
         cmd1 = 'iptables -L -n -v '
         output = os.popen(cmd1).read()
-        print '#'*40
+        print '#'*20 + "FILTER" + '#'*20
         print output
 
         cmd1 = 'iptables -t nat -L -n -v '
         output = os.popen(cmd1).read()
-        print '#'*40
+        print '#'*21 + "NAT" + '#'*21
         print output
         return 
 
@@ -262,10 +283,13 @@ class ShellEnabled(cmd.Cmd):
         """
         print "flushing the rules " + line  
         l = line.split() 
-        if len(l) > 1: 
+        PolicyRule.delete_all_rules() 
+        
+        if len(l) > 1 and len[1] == 'all': 
+	    policy_flush_rules() 
             print "input needs to have one number" 
             return 
-	policy_flush_rules() 
+        
 	return 
       
     def emptyline(self): 
@@ -278,7 +302,7 @@ class ShellEnabled(cmd.Cmd):
         """
         list the queues  
         """
-        print "the line is " + line  
+        #print "the line is " + line  
         l = line.split() 
         if len(l) > 2: 
             print "input needs to have one number" 
@@ -291,7 +315,7 @@ class ShellEnabled(cmd.Cmd):
 	queues = tc_mgr.get_queue() 
 	print "queue numbers are: %s " % queues 
 	for q in queues: 
-	    print "queue %s details: %s" % (q, policy_db[str(q)]) 
+	    print "queue %s details: %s" % (q, str(policy_db[str(q)])) 
         return 
        
 
@@ -299,13 +323,24 @@ class ShellEnabled(cmd.Cmd):
         """
         exit the application 
         """
+        tc_mgr.handle_exit() 
+        #sys.exit()
         return True
 
     def do_EOF(self, line):
         """
         Ctrl+D to exit
         """
+        tc_mgr.handle_exit() 
         return True
+
+    def do_commit(self, line):
+        """
+        Commit TC configuration  
+        """
+        print "commit TC configuration" 
+        tc_mgr.service_restart()  
+        return 
 
 app = Flask(__name__)
 
@@ -339,8 +374,10 @@ def policy_rule_create(rule_num):
     action = request.json.get('action', 'ACCEPT')
     queue_num = request.json.get('queue_num', 0)
 
+    prule = PolicyRule(tc_mgr) 
     prule.create_rule_cmd(src, dst, action, queue_num) 
-    policy_db[rule_num] = request.get_json() 
+    #policy_db[rule_num] = request.get_json() 
+    tc_mgr.service_restart()  
 
     return jsonify({'result':policy_db[rule_num]}), 201 
 
@@ -364,8 +401,9 @@ def policy_rule_delete(rule_num):
     action = request.json.get('action', 'ACCEPT')
     queue_num = request.json.get('queue_num', 0)
 
-    policy_db.pop(rule_num, None)
+    prule = PolicyRule(tc_mgr) 
     prule.delete_rule_cmd(src, dst, action, queue_num) 
+    tc_mgr.service_restart()  
 
     return jsonify(policy_db), 201 
 
@@ -377,8 +415,6 @@ def policy_rule_get_all():
 def policy_flush_rules(): 
     os.system('iptables -F -t nat')
     os.system('iptables -F -t filter') 
-
-
 
 @app.route('/policy/rules/<int:rule_num>', \
            methods = ['GET'])
@@ -393,19 +429,27 @@ def start_web_server():
     app.run(debug=True, use_reloader=False, host='0.0.0.0')
 
 
+def main(): 
+    print("Starting Services and Shell, please wait...")
+    thread.start_new_thread(start_web_server, ())
+    time.sleep(2)
+    print("Shell started, only limited commands are supported")
+    logger.info("TC Manger Started Successfully") 
+
+    ShellEnabled().cmdloop() 
+    #while True: 
+    #    time.sleep(1)
+    #    pass
+
+
 
 if __name__ == "__main__":
     print("Starting Services and Shell, please wait...")
     thread.start_new_thread(start_web_server, ())
     time.sleep(2)
     print("Shell started, only limited commands are supported")
+    logger.info("TC Manger Started Successfully") 
 
     ShellEnabled().cmdloop() 
-
-# while True: 
-#        time.sleep(1)
-#        pass
-
-
 
 

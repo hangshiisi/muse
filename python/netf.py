@@ -6,9 +6,9 @@ import logging
 import multiprocessing 
 import traceback 
 
-logger = logging.getLogger('MuseTC')
+logger = logging.getLogger(__name__)
 hdlr = logging.FileHandler('/var/log/MuseTC.log')
-formatter = logging.Formatter('%(asctime)s-%(levelname)s-(%(threadName)-10s) %(message)s')
+formatter = logging.Formatter('%(asctime)s-%(name)s-%(levelname)s-(%(threadName)-10s) %(message)s')
 hdlr.setFormatter(formatter)
 logger.addHandler(hdlr)
 logger.setLevel(logging.DEBUG)
@@ -27,9 +27,9 @@ class NFQueue(multiprocessing.Process):
     _queues = []
 
     def __init__(self, queues): 
+        multiprocessing.Process.__init__(self)
         self._queues = queues
         self._nfqueue = NetfilterQueue() 
-        super(NFQueue, self).__init__()
 
     def handle_pkt(self, queue, pkt): 
         logger.debug('Queue %s pkt len %s content %s' %
@@ -52,6 +52,7 @@ class NFQueue(multiprocessing.Process):
     def run(self): 
         for i in self._queues: 
             self._nfqueue.bind(i, curry(self.handle_pkt, i))
+            logger.info("Bind queue %s" % i) 
 
         try: 
             self._nfqueue.run()
@@ -81,8 +82,7 @@ class TCManager(object):
         #for line in traceback.format_stack(): 
         #    print line.strip() 
 	
-        #logger.debug("TC Packet Manager Invoked")  
-        pass 
+        logger.debug("TC Packet Manager Invoked")  
 
     def service_restart(self): 
         logger.debug("queue thread alive and number are %s, %s" %  
@@ -94,6 +94,7 @@ class TCManager(object):
         if self._nfq_thread and self._nfq_thread.is_alive(): 
             #need to call stop thread function 
             logger.debug("Updating packet handler with new configuration " )
+            #self._nfq_thread.kill()
             self._nfq_thread.terminate()
             self._nfq_thread.join()
         else: 
@@ -109,25 +110,42 @@ class TCManager(object):
         self._queues.append(queue_num)
         #call service restart in order to make
         #the changes effective 
-        self.service_restart() 
+        #self.service_restart() 
 
     def remove_queue(self, queue_num): 
-        self._queues.remove(queue_num) 
+        try: 
+            self._queues.remove(queue_num) 
+        except: 
+            # handle restart scenario, just pass
+            pass
+
         #call service restart in order to make
         #the changes effective 
-        self.service_restart() 
+        #self.service_restart() 
 
     def get_queue(self): 
         #return queue info
         return self._queues 
 
+    def handle_exit(self): 
+        if self._nfq_thread and self._nfq_thread.is_alive(): 
+            #need to call stop thread function 
+            logger.debug("Got singal to kill the thread")
+            #self._nfq_thread.kill()
+            self._nfq_thread.terminate()
+            self._nfq_thread.join()
+ 
+
 if __name__ == "__main__":
     tc = TCManager()  
     tc.add_queue(900) 
     tc.add_queue(900) 
+    tc.service_restart()
     tc.add_queue(2) 
     tc.add_queue(3) 
+    tc.service_restart()
     tc.remove_queue(2) 
+    tc.service_restart()
 
     print "current queue is %s " % tc.get_queue()
 

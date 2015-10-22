@@ -373,8 +373,8 @@ def policy_rule_create(rule_num):
 
     #app.logger.debug('Info %s ' % data)
     src = request.json.get('src', '192.168.1.1') 
-    dst = request.json.get('dst', '192.168.2.1')
-    action = request.json.get('action', 'ACCEPT')
+    dst = request.json.get('dst', '0.0.0.0')
+    action = request.json.get('action', 'NFQUEUE')
     queue_num = request.json.get('queue_num', 0)
 
     prule = PolicyRule(tc_mgr) 
@@ -400,8 +400,8 @@ def policy_rule_delete(rule_num):
 
     #app.logger.debug('Info %s ' % data)
     src = request.json.get('src', '192.168.1.1') 
-    dst = request.json.get('dst', '192.168.2.1')
-    action = request.json.get('action', 'ACCEPT')
+    dst = request.json.get('dst', '0.0.0.0')
+    action = request.json.get('action', 'NFQUEUE')
     queue_num = request.json.get('queue_num', 0)
 
     prule = PolicyRule(tc_mgr) 

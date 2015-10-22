@@ -426,7 +426,7 @@ def policy_rule_get_one(rule_num):
     return jsonify({'result':rule}) 
 
 def start_web_server(): 
-    app.run(debug=True, use_reloader=False, host='0.0.0.0')
+    app.run(debug=True, port=5555, use_reloader=False, host='0.0.0.0')
 
 
 def main(): 

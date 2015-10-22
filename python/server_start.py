@@ -88,7 +88,8 @@ class PolicyRule(object):
             print(' ignored or delete before add') 
             return 
  
-        cmd = 'sudo iptables -I FORWARD %s ' % str(qnum) 
+        #cmd = 'sudo iptables -I FORWARD %s ' % str(qnum) 
+        cmd = 'sudo iptables -A FORWARD '  
 
         data = {}
         cmd += '--src ' + src + ' ' 
@@ -102,8 +103,9 @@ class PolicyRule(object):
         data['queue-num'] = qnum 
 	policy_db[qnum] = json.dumps(data) 
         
-        print "command is " + cmd 
-        logging.info("Creating rule %s " % cmd)
+        logger.info("KKK Key is %s and type %s " % (qnum, type(qnum)))
+        logger.info("command is %s " % cmd ) 
+        logger.info("Creating rule %s " % cmd)
         os.system(cmd) 
         if self._tc_mgr: 
             self._tc_mgr.add_queue(int(qnum)) 
@@ -362,10 +364,11 @@ def policy_rule_create(rule_num):
     if not request.json: 
         abort(400)
 
-    print 'policy num %s ' % rule_num 
-    print 'request method is %s ' % request.method 
+    logger.info('policy num %s type %s ' 
+                 % (rule_num, type(rule_num))) 
+    logger.info('request method is %s ' % request.method)
 
-    print 'AB1 the request json data is %s ' % request.data
+    logger.info('AB1 the request json data is %s ' % request.data)
 
 
     #app.logger.debug('Info %s ' % data)
@@ -379,7 +382,7 @@ def policy_rule_create(rule_num):
     #policy_db[rule_num] = request.get_json() 
     tc_mgr.service_restart()  
 
-    return jsonify({'result':policy_db[rule_num]}), 201 
+    return jsonify({'result':policy_db[int(queue_num)]}), 201 
 
 
 

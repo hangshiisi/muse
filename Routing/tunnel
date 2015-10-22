@@ -4,20 +4,26 @@ import requests
 import datetime 
 import time 
 
+post_url = "http://104.130.140.175/com.huawei.dockerMSD/servicePath/add" 
+
 #get client name from environment variables passed in
 #by PPP, should be used one from /etc/chap-secrets 
 #
+#print os.environ
+
 try: 
-    clientname = os.environ["PEERNAME"] 
+    clientname = os.environ['PEERNAME'] 
 except: 
+    print "environ PEERNAME not exists" 
     exit() 
 
 #get the IP address assigned to remote client 
 #in our case, UE 
 #it could use PPP_REMOTE as well 
 try: 
-    clientIP = os.environ["IPREMOTE"]
+    clientIP = os.environ['IPREMOTE']
 except: 
+    print "environ IP Remote not exists" 
     exit()
 
 
@@ -28,14 +34,15 @@ with open("/var/log/muse.log", "a") as f:
               (st, clientname, clientIP)) 
     # send REST request to MUSE orchestrator 
     
-    # payload = {'key1': 'value1', 'key2': 'value2'}
-    # r = requests.post("http://httpbin.org/post", data=payload)
-    # print(r.text) 
-    # if r.status_code == requests.codes.ok: 
-    #    f.write("success in post requests")
-    # else: 
-    #    f.write("failure in post requests")
-    #
+    payload = {'subscribeName': clientname, 'IP': clientIP}
+    r = requests.post(post_url, 
+                      data=payload)
+    f.write(r.text) 
+    if r.status_code == requests.codes.ok: 
+       f.write("success in post requests")
+    else: 
+       f.write("failure in post requests")
+    
 
 #all done, bye 
 

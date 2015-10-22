@@ -27,7 +27,7 @@ except:
     exit()
 
 
-with open("/var/log/muse.log", "a") as f: 
+with open("/var/log/muse_connection.log", "a") as f: 
     ts = time.time() 
     st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
     f.write("%s UE client '%s' connected as '%s' \n" % 
@@ -39,9 +39,9 @@ with open("/var/log/muse.log", "a") as f:
                       data=payload)
     f.write(r.text) 
     if r.status_code == requests.codes.ok: 
-       f.write("success in post requests")
+       f.write("success in post requests \n")
     else: 
-       f.write("failure in post requests")
+       f.write("failure in post requests \n")
     
 
 #all done, bye 

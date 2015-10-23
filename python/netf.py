@@ -35,6 +35,8 @@ class NFQueue(multiprocessing.Process):
         logger.debug('Queue %s pkt len %s content %s' %
                        (queue, pkt.get_payload_len(), pkt)) 
 
+        print('Queue %s pkt len %s content %s' %
+                       (queue, pkt.get_payload_len(), pkt)) 
         o_pkt = IP(pkt.get_payload()) 
         m = MPLS(label=0x9, cos = 0x3) 
         #new_pkt = IP(dst=o_pkt[IP].dst, src=o_pkt[IP].src, \
@@ -110,7 +112,7 @@ class TCManager(object):
         self._queues.append(queue_num)
         #call service restart in order to make
         #the changes effective 
-        #self.service_restart() 
+        self.service_restart() 
 
     def remove_queue(self, queue_num): 
         try: 
@@ -121,7 +123,7 @@ class TCManager(object):
 
         #call service restart in order to make
         #the changes effective 
-        #self.service_restart() 
+        self.service_restart() 
 
     def get_queue(self): 
         #return queue info

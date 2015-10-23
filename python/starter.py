@@ -108,6 +108,7 @@ class PolicyRule(object):
         logger.info("Creating rule %s " % cmd)
         os.system(cmd) 
         if self._tc_mgr: 
+            logger.info("Add queue %s" % qnum)
             self._tc_mgr.add_queue(int(qnum)) 
          
         return  
@@ -193,8 +194,8 @@ class ShellEnabled(cmd.Cmd):
             return 
 
         # some default values 
-        src = '0.0.0.0'
-        dst = '0.0.0.0'
+        src = '0.0.0.0/0'
+        dst = '0.0.0.0/0'
         action = 'NFQUEUE'
         queue_num = 2 
        
@@ -231,8 +232,8 @@ class ShellEnabled(cmd.Cmd):
             return 
 
         # some default values 
-        src = '0.0.0.0'
-        dst = '0.0.0.0'
+        src = '0.0.0.0/0'
+        dst = '0.0.0.0/0'
         action = 'NFQUEUE'
         queue_num = 2 
        

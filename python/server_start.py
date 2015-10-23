@@ -135,7 +135,7 @@ class PolicyRule(object):
         return 
 
     @staticmethod 
-    def delete_all_rules(self):
+    def delete_all_rules():
         for index in policy_db: 
             cmd = 'sudo iptables -D FORWARD %s ' % index 
             logging.info("Deleting rule %s " % cmd)
@@ -193,8 +193,8 @@ class ShellEnabled(cmd.Cmd):
             return 
 
         # some default values 
-        src = '172.1.1.1'
-        dst = '172.1.2.1'
+        src = '0.0.0.0'
+        dst = '0.0.0.0'
         action = 'NFQUEUE'
         queue_num = 2 
        
@@ -231,8 +231,8 @@ class ShellEnabled(cmd.Cmd):
             return 
 
         # some default values 
-        src = '172.1.1.1'
-        dst = '172.1.2.1'
+        src = '0.0.0.0'
+        dst = '0.0.0.0'
         action = 'NFQUEUE'
         queue_num = 2 
        
@@ -375,7 +375,12 @@ def policy_rule_create(rule_num):
     src = request.json.get('src', '192.168.1.1') 
     dst = request.json.get('dst', '0.0.0.0')
     action = request.json.get('action', 'NFQUEUE')
-    queue_num = request.json.get('queue_num', 0)
+
+    #due to iptables limitation, we set queue_num 
+    #same as rule_num 
+    #queue_num = request.json.get('queue_num', 0)
+    queue_num = rule_num
+
 
     prule = PolicyRule(tc_mgr) 
     prule.create_rule_cmd(src, dst, action, queue_num) 
@@ -402,7 +407,10 @@ def policy_rule_delete(rule_num):
     src = request.json.get('src', '192.168.1.1') 
     dst = request.json.get('dst', '0.0.0.0')
     action = request.json.get('action', 'NFQUEUE')
-    queue_num = request.json.get('queue_num', 0)
+    #due to iptables limitation, we set queue_num 
+    #same as rule_num 
+    #queue_num = request.json.get('queue_num', 0)
+    queue_num = rule_num
 
     prule = PolicyRule(tc_mgr) 
     prule.delete_rule_cmd(src, dst, action, queue_num) 

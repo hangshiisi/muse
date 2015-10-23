@@ -88,7 +88,8 @@ class PolicyRule(object):
             print(' ignored or delete before add') 
             return 
  
-        cmd = 'sudo iptables -I FORWARD %s ' % str(qnum) 
+        #cmd = 'sudo iptables -I FORWARD %s ' % str(qnum) 
+        cmd = 'sudo iptables -A FORWARD '  
 
         data = {}
         cmd += '--src ' + src + ' ' 
@@ -102,8 +103,9 @@ class PolicyRule(object):
         data['queue-num'] = qnum 
 	policy_db[qnum] = json.dumps(data) 
         
-        print "command is " + cmd 
-        logging.info("Creating rule %s " % cmd)
+        logger.info("KKK Key is %s and type %s " % (qnum, type(qnum)))
+        logger.info("command is %s " % cmd ) 
+        logger.info("Creating rule %s " % cmd)
         os.system(cmd) 
         if self._tc_mgr: 
             self._tc_mgr.add_queue(int(qnum)) 
@@ -133,7 +135,7 @@ class PolicyRule(object):
         return 
 
     @staticmethod 
-    def delete_all_rules(self):
+    def delete_all_rules():
         for index in policy_db: 
             cmd = 'sudo iptables -D FORWARD %s ' % index 
             logging.info("Deleting rule %s " % cmd)
@@ -191,8 +193,8 @@ class ShellEnabled(cmd.Cmd):
             return 
 
         # some default values 
-        src = '172.1.1.1'
-        dst = '172.1.2.1'
+        src = '0.0.0.0'
+        dst = '0.0.0.0'
         action = 'NFQUEUE'
         queue_num = 2 
        
@@ -229,8 +231,8 @@ class ShellEnabled(cmd.Cmd):
             return 
 
         # some default values 
-        src = '172.1.1.1'
-        dst = '172.1.2.1'
+        src = '0.0.0.0'
+        dst = '0.0.0.0'
         action = 'NFQUEUE'
         queue_num = 2 
        
@@ -362,24 +364,30 @@ def policy_rule_create(rule_num):
     if not request.json: 
         abort(400)
 
-    print 'policy num %s ' % rule_num 
-    print 'request method is %s ' % request.method 
+    logger.info('policy num %s type %s ' 
+                 % (rule_num, type(rule_num))) 
+    logger.info('request method is %s ' % request.method)
 
-    print 'AB1 the request json data is %s ' % request.data
+    logger.info('AB1 the request json data is %s ' % request.data)
 
 
     #app.logger.debug('Info %s ' % data)
     src = request.json.get('src', '192.168.1.1') 
-    dst = request.json.get('dst', '192.168.2.1')
-    action = request.json.get('action', 'ACCEPT')
-    queue_num = request.json.get('queue_num', 0)
+    dst = request.json.get('dst', '0.0.0.0')
+    action = request.json.get('action', 'NFQUEUE')
+
+    #due to iptables limitation, we set queue_num 
+    #same as rule_num 
+    #queue_num = request.json.get('queue_num', 0)
+    queue_num = rule_num
+
 
     prule = PolicyRule(tc_mgr) 
     prule.create_rule_cmd(src, dst, action, queue_num) 
     #policy_db[rule_num] = request.get_json() 
     tc_mgr.service_restart()  
 
-    return jsonify({'result':policy_db[rule_num]}), 201 
+    return jsonify({'result':policy_db[int(queue_num)]}), 201 
 
 
 
@@ -397,9 +405,12 @@ def policy_rule_delete(rule_num):
 
     #app.logger.debug('Info %s ' % data)
     src = request.json.get('src', '192.168.1.1') 
-    dst = request.json.get('dst', '192.168.2.1')
-    action = request.json.get('action', 'ACCEPT')
-    queue_num = request.json.get('queue_num', 0)
+    dst = request.json.get('dst', '0.0.0.0')
+    action = request.json.get('action', 'NFQUEUE')
+    #due to iptables limitation, we set queue_num 
+    #same as rule_num 
+    #queue_num = request.json.get('queue_num', 0)
+    queue_num = rule_num
 
     prule = PolicyRule(tc_mgr) 
     prule.delete_rule_cmd(src, dst, action, queue_num) 
@@ -450,6 +461,9 @@ if __name__ == "__main__":
     print("Shell started, only limited commands are supported")
     logger.info("TC Manger Started Successfully") 
 
+    #while True: 
+    #    time.sleep(1)
+    #    pass
     ShellEnabled().cmdloop() 
 
 

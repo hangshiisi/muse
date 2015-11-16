@@ -30,7 +30,8 @@ static int pace2_netfilter_handle_packet( struct nfq_q_handle * const qh,
 
     packet_id = ntohl( nfq_ph->packet_id );
 
-    if ( ( payload_len = nfq_get_payload_ptr( nfad, ( char ** )&payload ) ) < 0 ) {
+    //if ( ( payload_len = nfq_get_payload_ptr( nfad, ( char ** )&payload ) ) < 0 ) {
+    if ( ( payload_len = nfq_get_payload( nfad, ( unsigned char ** )&payload ) ) < 0 ) {
         fprintf( stderr, "nfq_get_payload() failed.\n" );
         return 0;
     }
@@ -39,6 +40,8 @@ static int pace2_netfilter_handle_packet( struct nfq_q_handle * const qh,
         fprintf( stderr, "Timer error, could not read time from computer.\n" );
         return 0;
     }
+
+    fprintf(stderr, "Hello world"); 
 
     if ( payload_len > 0 ) {
         netfilter->callback( &tv, payload, payload_len, &packet_id, 3, netfilter->user_data );
@@ -103,6 +106,7 @@ void pace2_netfilter_exit( struct pace2_netfilter * const netfilter )
     netfilter->callback = NULL;
     netfilter->user_data = NULL;
 
+    fprintf( stderr, "Netfilter Exiting.\n");
     if ( netfilter->nfq_q_h != NULL ) nfq_destroy_queue( netfilter->nfq_q_h );
     if ( netfilter->nfq_h != NULL ) nfq_close( netfilter->nfq_h );
 

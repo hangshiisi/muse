@@ -335,7 +335,11 @@ static void stage1_and_2( const struct timeval * const time,
     }
     /* Stage 1: Prepare packet descriptor and run ip defragmentation */
     if ( pace2_s1_process_packet( content->pace2, 0, timestamp, (struct iphdr *)payload, payload_len, stage1_layer_type, &pd, NULL, 0 ) != PACE2_S1_SUCCESS ) {
-        pace2_netfilter_set_verdict( &content->netfilter, *packet_id, PACE2_NF_ACCEPT );
+        // pace2_netfilter_set_verdict( &content->netfilter, *packet_id, PACE2_NF_ACCEPT );
+        nfq_set_verdict( content->netfilter.nfq_q_h, *packet_id, PACE2_NF_ACCEPT, 
+                
+                           payload_len, 
+                           payload);
         return;
     }
     
@@ -351,6 +355,10 @@ static void stage1_and_2( const struct timeval * const time,
     }
 
     stage3_to_5(content);
+        nfq_set_verdict( content->netfilter.nfq_q_h, *packet_id, PACE2_NF_ACCEPT, 
+                
+                           payload_len, 
+                           payload);
 } /* stage1_and_2 */
 
 static void pace_cleanup_and_exit( content_t * const content )

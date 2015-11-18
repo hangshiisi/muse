@@ -8,4 +8,4 @@ clean:
 	rm pace2_integration_example
 
 pace2_integration_example: pace2_integration_example.c event_handler.c pace2_netfilter.c 
-	cc $? $(CFLAGS) -rdynamic ../lib/libipoque_pace2_static.a -lpcap -lnfnetlink -lnetfilter_queue -lz -I../include/ipoque -o $@
+	cc $? $(CFLAGS) -rdynamic ../ipoque/lib/libipoque_pace2_static.a -lpcap -lnfnetlink -lnetfilter_queue -lz -I../ipoque/include/ipoque -o $@

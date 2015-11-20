@@ -3,6 +3,76 @@
 #include <libnetfilter_queue/libnetfilter_queue.h>
 #include <stdio.h>
 
+#include "list.h" 
+
+typedef struct muse_context_ { 
+      struct list_head list_member;
+
+      /* nflink handler information */ 
+      struct nfq_handle *nfqHandle;
+      struct nfq_q_handle *myQueue;
+      struct nfnl_handle *netlinkHandle;
+      /* user specific information */ 
+      unsigned int queue_num; 
+      unsigned int rule_num; 
+} muse_context_t; 
+
+void add_node(int arg, struct list_head *head)
+{
+    struct foo *fooPtr = (struct foo *)malloc(sizeof(struct foo));
+    assert(fooPtr != NULL);
+
+    fooPtr->info = arg;
+    INIT_LIST_HEAD(&fooPtr->list_member);
+    list_add(&fooPtr->list_member, head);
+}
+
+void display(struct list_head *head)
+{
+    struct list_head *iter;
+    struct foo *objPtr;
+
+    __list_for_each(iter, head) {
+        objPtr = list_entry(iter, struct foo, list_member);
+        printf("%d ", objPtr->info);
+    }
+    printf("\n");
+}
+
+void delete_all(struct list_head *head)
+{
+    struct list_head *iter;
+    struct foo *objPtr;
+
+  redo:
+    __list_for_each(iter, head) {
+        objPtr = list_entry(iter, struct foo, list_member);
+        list_del(&objPtr->list_member);
+        free(objPtr);
+        goto redo;
+    }
+}
+
+
+int find_first_and_delete(int arg, struct list_head *head)
+{
+    struct list_head *iter;
+    struct foo *objPtr;
+
+    __list_for_each(iter, head) {
+        objPtr = list_entry(iter, struct foo, list_member);
+        if(objPtr->info == arg) {
+            list_del(&objPtr->list_member);
+            free(objPtr);
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+
+
 int handler(struct nfq_q_handle *myQueue, struct nfgenmsg *msg, struct nfq_data *pkt,   void *cbData) {
     int id = 0;
     struct nfqnl_msg_packet_hdr *header;

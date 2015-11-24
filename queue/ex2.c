@@ -148,8 +148,27 @@ int create_nfq_queue(muse_context_t *ctxt)
     return 0; 
 }
 
-void destroy_nfq_queue(muse_context_t *ctxt) 
+int destroy_nfq_queue(muse_context_t *ctxt) 
 { 
+    assert(ctxt); 
+    nfq_destroy_queue(ctxt->myQueue);
+    nfq_close(ctxt->nfqHandle);
+} 
+
+/* 
+ * loop through all active queues and handle
+ * those that have packets arriving 
+ */ 
+int servce_all_queues(struct list_head *head) 
+{ 
+    // loop through all list members 
+    // add then into the set via FD_SET
+
+
+    // monitor all queues 
+    // once data is available, handles the 
+    // queues and go back to monitor next 
+    // set of requets 
 
 
 } 
@@ -163,13 +182,18 @@ int main(int argc, char **argv)
     int fd, res;
     char buf[4096];
     
-    muse_context_t *node; 
+    muse_context_t *node1, *node2; 
 
-    node = ctxt_add_node(&ctxt_head, 1, 100);  
-
+    node1 = ctxt_add_node(&ctxt_head, 1, 100);  
+    node2 = ctxt_add_node(&ctxt_head, 2, 200);  
 
     //create a few queues 
-    if (0 != create_nfq_queue(node)) { 
+    if (0 != create_nfq_queue(node1)) { 
+        perror("invoking create queue failure"); 
+        return -1; 
+    } 
+
+    if (0 != create_nfq_queue(node2)) { 
         perror("invoking create queue failure"); 
         return -1; 
     } 
@@ -177,14 +201,14 @@ int main(int argc, char **argv)
     //run the scheduler 
     //netlinkHandle = nfq_nfnlh(nfqHandle);
     // or use fd = nfq_fd(node->nfqHandle); 
-    fd = nfnl_fd(node->netlinkHandle);
+    fd = nfnl_fd(node1->netlinkHandle);
 
     while ((res = recv(fd, buf, sizeof(buf), 0)) && res >= 0)
-        nfq_handle_packet(node->nfqHandle, buf, res);
+        nfq_handle_packet(node1->nfqHandle, buf, res);
 
     //destroy those queues 
-    nfq_destroy_queue(myQueue);
-    nfq_close(nfqHandle);
+    destroy_nfq_queue(node1); 
+    destroy_nfq_queue(node2); 
 
     if (1) { 
         return 0; 

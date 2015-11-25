@@ -159,18 +159,61 @@ int destroy_nfq_queue(muse_context_t *ctxt)
  * loop through all active queues and handle
  * those that have packets arriving 
  */ 
-int servce_all_queues(struct list_head *head) 
+int service_all_queues(struct list_head *head) 
 { 
+    fd_set active_fd_set, read_fd_set;
+    struct list_head *iter;
+    muse_context_t *objPtr;
+    int fd, res;
+    static char buf[4096]; 
+
     // loop through all list members 
     // add then into the set via FD_SET
-
+    FD_ZERO (&active_fd_set);
+    __list_for_each(iter, head) {
+        objPtr = list_entry(iter, muse_context_t, list_member);
+        if (objPtr == NULL) { 
+            continue; 
+        } 
+        FD_SET(nfnl_fd(objPtr->netlinkHandle), 
+               &active_fd_set);
+        printf("setting fd %d ", nfnl_fd(objPtr->netlinkHandle)); 
+    } 
 
     // monitor all queues 
     // once data is available, handles the 
     // queues and go back to monitor next 
     // set of requets 
+    while(1) { 
+        /* Block until input arrives on one or more active sockets. */
+        read_fd_set = active_fd_set;
+        if (select(FD_SETSIZE, &read_fd_set, NULL, 
+                    NULL, NULL) < 0) {
+            perror ("select");
+            exit (EXIT_FAILURE);
+        }
 
+        printf("Read one more packet\n"); 
+        
+        /* packets arrive */ 
+        __list_for_each(iter, head) {
+            objPtr = list_entry(iter, muse_context_t, list_member);
+            if (objPtr == NULL) { 
+                continue; 
+            } 
 
+            fd = nfnl_fd(objPtr->netlinkHandle); 
+            if (FD_ISSET(fd, &read_fd_set)) { 
+                while ((res = recv(fd, buf, sizeof(buf), 
+                               0)) && res > 0) { 
+                    nfq_handle_packet(objPtr->nfqHandle, buf, res);
+                }
+            }
+
+        } 
+    } 
+
+    return 0; 
 } 
 
 int main(int argc, char **argv) 
@@ -201,10 +244,16 @@ int main(int argc, char **argv)
     //run the scheduler 
     //netlinkHandle = nfq_nfnlh(nfqHandle);
     // or use fd = nfq_fd(node->nfqHandle); 
+    /* 
+     * approach 1
     fd = nfnl_fd(node1->netlinkHandle);
-
     while ((res = recv(fd, buf, sizeof(buf), 0)) && res >= 0)
         nfq_handle_packet(node1->nfqHandle, buf, res);
+     */ 
+
+    /* use approach 2, to support multiple queues */ 
+    printf("getting into the queue services \n"); 
+    service_all_queues(&ctxt_head); 
 
     //destroy those queues 
     destroy_nfq_queue(node1); 

@@ -8,9 +8,9 @@ clean:
 	rm queue_example ex2 
 
 queue_example: queue_example.c  
-	cc $? $(CFLAGS) -lpcap -lnfnetlink -lnetfilter_queue -lz -o $@
+	gcc $? $(CFLAGS) -lpcap -lnfnetlink -lnetfilter_queue -lz -o $@
 
 
 
 ex2: ex2.c  
-	cc $? $(CFLAGS) -lpcap -lnfnetlink -lnetfilter_queue -lz -o $@
+	gcc $? $(CFLAGS) -lpcap -lnfnetlink -lnetfilter_queue -lz -o $@

@@ -1,7 +1,7 @@
-all: CFLAGS := -O2 $(CFLAGS)
+all: CFLAGS := -std=c99 -O2 $(CFLAGS)
 all: shm_server shm_client 
 
-debug: CFLAGS := -g -O0 $(CFLAGS)
+debug: CFLAGS := -std=c99 -g -O0 $(CFLAGS)
 debug: shm_server shm_client 
 
 clean:

@@ -86,7 +86,7 @@ int ctxt_find_first_and_delete(unsigned int rule_num,
     return 0;
 }
 
-int handler(struct nfq_q_handle *myQueue, struct nfgenmsg *msg, 
+int packet_handler(struct nfq_q_handle *myQueue, struct nfgenmsg *msg, 
             struct nfq_data *pkt, void *cbData) {
     int id = 0;
     struct nfqnl_msg_packet_hdr *header;
@@ -104,8 +104,8 @@ int handler(struct nfq_q_handle *myQueue, struct nfgenmsg *msg,
     printf("thread %u queue %u data[ %d ]:\n", 
            ctxt->rule_num, ctxt->queue_num, len);
 
-    for (i = 0; i < len; i++)
-        printf("%2d 0x%02x %3d %c\n", i, pktData[i], pktData[i], pktData[i]);
+    // for (i = 0; i < len; i++)
+    //    printf("%2d 0x%02x %3d %c\n", i, pktData[i], pktData[i], pktData[i]);
 
     printf("\n");
 
@@ -130,7 +130,7 @@ int create_nfq_queue(muse_context_t *ctxt)
 
     // define a handler
     if (!(ctxt->myQueue = nfq_create_queue(ctxt->nfqHandle, ctxt->queue_num, 
-                                     &handler, 
+                                     &packet_handler, 
                                      ctxt))) {
         perror("Error in nfq_create_queue()");
         return(1);
@@ -260,11 +260,12 @@ int main(int argc, char **argv)
     destroy_nfq_queue(node2); 
 
     if (1) { 
-        return 0; 
+       return 0; 
     } 
 
 
     /////////////////////////////////////////////
+    /////// old codes, no longer in use /////////
     /////////////////////////////////////////////
     // queue connection
     if (!(nfqHandle = nfq_open())) {
@@ -279,7 +280,8 @@ int main(int argc, char **argv)
     }
 
     // define a handler
-    if (!(myQueue = nfq_create_queue(nfqHandle, 0, &handler, NULL))) {
+    if (!(myQueue = nfq_create_queue(nfqHandle, 0, 
+                                     &packet_handler, NULL))) {
         perror("Error in nfq_create_queue()");
         return(1);
     }

@@ -1,3 +1,6 @@
+#define _GNU_SOURCE
+
+
 /*
  * shm-client - client program to demonstrate shared memory.
  */

@@ -1,0 +1,25 @@
+204  sudo easy_install pip
+  Installation on Mac: 
+	  sudo pip install ansible
+  	  ansible testserver -i hosts -m ping
+  (wrong command)   ansible testserver -i hosts -m ping yahoo.com
+  (working one)  ansible testserver -i hosts -m ping
+  using the port 2222:   
+      (port forwarding is configured for vagrant box) 
+       vagrant ssh
+  
+  (after using ansible.cfg) 
+	ansible testserver -i hosts -m ping
+        sequence of ansible config: 
+            (ANSIBLE_CONFIG, ./ansible.cfg, ~/.ansible_cfg 
+             /etc/ansible/ansible.cfg) 
+        ansible.cfg
+  	vi hosts
+  	cp hosts hosts_old
+        vi hosts
+        ansible testserver -m ping
+        cp ansible.cfg hosts hosts_old ~/SC/muse/AN/
+        ansible testserver -m command -a uptime
+
+
+   

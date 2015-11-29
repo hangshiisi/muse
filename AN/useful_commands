@@ -1,5 +1,7 @@
-204  sudo easy_install pip
+Initial: Getting Started on Ansible 
+
   Installation on Mac: 
+  	  sudo easy_install pip
 	  sudo pip install ansible
   	  ansible testserver -i hosts -m ping
   (wrong command)   ansible testserver -i hosts -m ping yahoo.com
@@ -22,4 +24,26 @@
         ansible testserver -m command -a uptime
 
 
+   ansible testserver -a uptime
+   ansible testserver -a "tail /var/log/dmesg"
+
+   (add root access) 
+    
+   ansible testserver -s -a "tail /var/log/dmesg"
+
+   ** above uses two modules: ping module, and command module 
+
+   run package installation (e.g. ubuntu, install nginx) 
+   	ansible testserver -s -m apt -a name=nginx
+   check/update package list: 
+   	ansible testserver -s -m apt -a name=nginx update_cache=yes
+
+   ** restart service 
+   ansible testserver -s -m service -a "name=nginx state=restarted" 
+
    
+Playbook
+	YAML truthy: 
+	YAML falsey: 
+
+ 

@@ -127,26 +127,48 @@ tc_destroy_memory_store(mz_mem_store_handle_t *handle)
     return 0; 
 } 
 
-void *tc_alloc_memory_record(mz_mem_store_handle_t *handle) 
+void *
+tc_alloc_memory_record(mz_mem_store_handle_t *handle) 
 {
     bitmap_t bm;
     int i;
+    unsigned *start = NULL; 
+
+    assert(handle); 
+    bm = handle->bitmap_start;
+
+    //    printf("nm address is %p %p \n", bm, 
+    //       handle->mem_start);
+    for (i = 0; i < handle->max_num; i++) {
+        if (get_bitmap(bm, i) == 0) {
+            set_bitmap(bm, i);
+            printf("return nodes at %d \n", i);
+            
+            start = handle->mem_start + sizeof(mz_record_t) * i;
+            bzero(start, sizeof(mz_record_t)); 
+            return start; 
+        }
+    }
+
+    return start; 
+} 
+
+void *
+tc_get_memory_record(mz_mem_store_handle_t *handle, int index) 
+{
+    bitmap_t bm;
 
     assert(handle); 
     bm = handle->bitmap_start;
     printf("nm address is %p %p \n", bm, 
            handle->mem_start);
-    for (i = 0; i < handle->max_num; i++) {
-        if (get_bitmap(bm, i) == 0) {
-            set_bitmap(bm, i);
-            printf("return nodes at %d \n", i);
-            return handle->mem_start + sizeof(mz_record_t) * i;
-        }
+    if (get_bitmap(bm, index) != 0) {
+        printf("retrieve nodes at %d \n", index);
+        return handle->mem_start + sizeof(mz_record_t) * index;
     }
 
     return NULL; 
 } 
-
 
 void 
 tc_free_memory_record(mz_mem_store_handle_t *handle, 
@@ -182,18 +204,16 @@ tc_get_mem_head(mz_mem_store_handle_t *handle)
 
 int tc_mem_test ()
 {
-  char c;
   int shmid;
   key_t key;
   char *shm;
   int i = 0; 
  
   unsigned int max_num = 1024; 
-  unsigned int mem_size; 
-  mz_shr_data_hdr_t *hdr; 
-  mz_record_t *node; 
-  mz_mem_store_handle_t hdl; 
-   
+  unsigned int mem_size = 0; 
+  mz_record_t *node = NULL; 
+  mz_mem_store_handle_t hdl = {0} ; 
+  struct list_head *fo_list, *iter;  
 
   /*
    * We'll name our shared memory segment
@@ -211,35 +231,52 @@ int tc_mem_test ()
 
   assert(hdl.max_num == max_num); 
   assert(hdl.key == key); 
-        
+ 
+  
+  fo_list = tc_get_mem_head(&hdl); 
+
+   
   printf("setting deadbeeft %d mem_size %d \n", 
          hdl.max_num, mem_size); 
-
-  node = (mz_record_t *)shm;     
-  for (i = 0; i < max_num; i++) { 
-      printf("setting at %p \n", &node[i]); 
-      //node[i].f1 = i; 
-      //node[i].f2 = i + 1; 
-  } 
 
   for (i = 0; i < max_num; i++) { 
       node = tc_alloc_memory_record(&hdl); 
       assert(node != NULL); 
-      //assert(node->f1 == i); 
-      //assert(node->f2 == i + 1);    
+      node->rule_num = i; 
+      node->queue_num = i + 1;    
+      node->app_info = i + 2;    
+      INIT_LIST_HEAD(&node->list_member);
+      list_add(&node->list_member, fo_list);    
   } 
 
   node = tc_alloc_memory_record(&hdl); 
   assert(node == NULL); 
  
+  for (i = 0; i < max_num; i++) { 
+      node = tc_get_memory_record(&hdl, i); 
+      assert(node != NULL); 
+      assert(node->rule_num == i); 
+      assert(node->queue_num == i + 1);    
+      assert(node->app_info == i + 2);    
+  } 
+
+  
+  __list_for_each(iter, fo_list) { 
+      node = list_entry(iter, mz_record_t, list_member); 
+      assert(node != NULL); 
+      assert(node->queue_num == node->rule_num + 1); 
+      assert(node->app_info == node->rule_num + 2);   
+  } 
+
+
   /*
    * Finally, we wait until the other process 
    * changes the first character of our memory
    * to '*', indicating that it has read what 
    * we put there.
    */
-  while (hdr->max_num !=0) { 
-      printf("sleep 5 seconds more \n"); 
+  while (hdl.max_num !=0) { 
+      printf("sleep waiting for max_num to be cleared\n"); 
       sleep (5);
   } 
 

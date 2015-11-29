@@ -25,6 +25,8 @@ typedef struct mz_fo_data_t_ {
 
 typedef struct mz_record_t_
 {
+    struct list_head list_member;
+
     int rule_num; //from orchestrator
     int queue_num;//from orchestrator, and L3/L4 classification 
     int app_info; // from DPI 
@@ -75,6 +77,7 @@ void *tc_alloc_memory_record(mz_mem_store_handle_t *handle);
 void tc_free_memory_record(mz_mem_store_handle_t *handle, 
                            void *node); 
 struct list_head *tc_get_mem_head(mz_mem_store_handle_t *handle); 
+void *tc_get_memory_record(mz_mem_store_handle_t *handle, int index); 
 
 #endif 
 

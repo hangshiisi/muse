@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <assert.h> 
 #include <unistd.h> 
+#include <memory.h> 
 
 // #define SHMSZ     27
 
@@ -90,10 +91,13 @@ void *alloc_mz_node(unsigned char *shr_mem,
     int i; 
     
     bm = get_start_bitmap(shr_mem, max_num); 
+    printf("nm address is %p %p \n", bm, shr_mem); 
     for (i = 0; i < max_num; i++) { 
+   //     printf("get bitmap value %d ", get_bitmap(bm, i)); 
 	if (get_bitmap(bm, i) == 0) { 
             set_bitmap(bm, i); 
-            return shr_mem + sizeof(mz_record_t) * (i - 1); 
+            printf("return nodes at %d \n", i); 
+            return shr_mem + sizeof(mz_record_t) * i; 
         } 
     } 
 
@@ -157,28 +161,56 @@ int main ()
    * Now put some things into the memory for the
    * other process to read.
    */
+  memset(shm, 0, mem_size);
+  bzero(shm, mem_size); 
+
+  /*  
+  unsigned char *ch = (unsigned char *)shm; 
+  for (int i = 0; i < mem_size; i++) { 
+       printf("i value is %d mem_size %d %d\n", 
+              i, mem_size, ch[i]); 
+       assert(ch[i] == (unsigned char)0); 
+  } */ 
+            
   hdr = (mz_shr_data_hdr_t *)get_start_shr_mem_header(shm, max_num); 
   assert(hdr); 
+
 
   hdr->max_num = max_num; 
   hdr->next = (void *) 0xDEAD; 
   hdr->prev = (void *) 0xBEEF; 
+  printf("setting deadbeeft %p mem_size %d \n", 
+         hdr, mem_size); 
 
   node = (mz_record_t *)shm;     
   for (int i = 0; i < max_num; i++) { 
+      printf("setting at %p \n", &node[i]); 
       node[i].f1 = i; 
       node[i].f2 = i + 1; 
   } 
 
+  for (int i = 0; i < max_num; i++) { 
+      node = alloc_mz_node(shm, max_num); 
+      assert(node != NULL); 
+      assert(node->f1 == i); 
+      assert(node->f2 == i + 1);    
+  } 
 
+  node = alloc_mz_node(shm, max_num); 
+  assert(node == NULL); 
+ 
   /*
    * Finally, we wait until the other process 
    * changes the first character of our memory
    * to '*', indicating that it has read what 
    * we put there.
    */
-  while (hdr->max_num !=0)
-    sleep (1);
+  while (hdr->max_num !=0) { 
+      printf("sleep 5 seconds more \n"); 
+      sleep (5);
+  } 
+
+  printf("max is set to 0 right now, all done\n"); 
 
   exit (0);
 }

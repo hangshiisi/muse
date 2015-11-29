@@ -142,7 +142,7 @@ tc_alloc_memory_record(mz_mem_store_handle_t *handle)
     for (i = 0; i < handle->max_num; i++) {
         if (get_bitmap(bm, i) == 0) {
             set_bitmap(bm, i);
-            printf("return nodes at %d \n", i);
+            // printf("return nodes at %d \n", i);
             
             start = handle->mem_start + sizeof(mz_record_t) * i;
             bzero(start, sizeof(mz_record_t)); 
@@ -160,10 +160,11 @@ tc_get_memory_record(mz_mem_store_handle_t *handle, int index)
 
     assert(handle); 
     bm = handle->bitmap_start;
-    printf("nm address is %p %p \n", bm, 
-           handle->mem_start);
+    //printf("nm address is %p %p \n", bm, 
+    //       handle->mem_start);
+
     if (get_bitmap(bm, index) != 0) {
-        printf("retrieve nodes at %d \n", index);
+        // printf("retrieve nodes at %d \n", index);
         return handle->mem_start + sizeof(mz_record_t) * index;
     }
 

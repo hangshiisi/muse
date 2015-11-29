@@ -7,6 +7,7 @@
 #include <assert.h> 
 
 #include "list.h" 
+#include "tc_mem.h" 
 
 LIST_HEAD(ctxt_head); 
 
@@ -224,7 +225,11 @@ int main(int argc, char **argv)
 
     int fd, res;
     char buf[4096];
-    
+   
+    if (1) { 
+        tc_mem_test(); 
+    } 
+ 
     muse_context_t *node1, *node2; 
 
     node1 = ctxt_add_node(&ctxt_head, 1, 100);  

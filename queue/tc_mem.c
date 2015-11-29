@@ -42,44 +42,145 @@ get_start_bitmap(unsigned char *shr_mem,
     return start;
 }
 
-/* 
- * better to encapsulate details of max_num 
- */ 
-void *alloc_mz_node(unsigned char *shr_mem, 
-                    unsigned int max_num) 
-{ 
-    bitmap_t bm; 
-    int i; 
-    
-    bm = get_start_bitmap(shr_mem, max_num); 
-    printf("nm address is %p %p \n", bm, shr_mem); 
-    for (i = 0; i < max_num; i++) { 
-	if (get_bitmap(bm, i) == 0) { 
-            set_bitmap(bm, i); 
-            printf("return nodes at %d \n", i); 
-            return shr_mem + sizeof(mz_record_t) * i; 
-        } 
-    } 
+static unsigned int
+get_size_shr_mem_total (int max_num)
+{
+  unsigned int total = 0;
 
-    return NULL; 
+  total += max_num * sizeof (mz_record_t);
+
+  total += sizeof (mz_shr_data_hdr_t);
+
+  total += (max_num + 7) / sizeof (unsigned char);
+
+  return total;
 }
 
-void free_mz_node(unsigned char *shr_mem, 
-                  unsigned int max_num, 
-                  void *node) 
+static unsigned char *
+get_start_shr_mem_header(unsigned char *shr_mem,
+                         unsigned int max_num) {
+    unsigned char *start = shr_mem;
+
+    start += max_num * sizeof (mz_record_t);
+
+    return start;
+}
+
+int 
+tc_create_memory_store(mz_mem_store_handle_t *handle, 
+                       int max_num, 
+                       key_t key)
 { 
-    bitmap_t bm; 
-    int i; 
+    int shmid;
+    char *shm;
+    unsigned int mem_size;
+    mz_shr_data_hdr_t *hdr; 
+
+    assert(handle); 
+    mem_size = get_size_shr_mem_total(max_num);
+    printf("create memory size %d \n", mem_size); 
+
+    /*
+     * Create the segment.
+     */
+    if ((shmid = shmget (key, mem_size, 
+                         IPC_CREAT | 0666)) < 0) {
+        perror ("shmget");
+        exit (1);
+    }
+
+    /*
+     * Now we attach the segment to our data space.
+     */
+    if ((shm = shmat (shmid, NULL, 0)) == (char *) -1) {
+        perror ("shmat");
+        exit (1);
+    }
+
+    bzero(shm, mem_size);
+  
+    handle->max_num = max_num; 
+    handle->shm_id = shmid; 
+    handle->key = key; 
+    handle->mem_size = mem_size; 
+
+    handle->mem_start = shm; 
+    handle->data_start = shm; 
+    handle->header_start = get_start_shr_mem_header(shm, 
+                                  max_num); 
+    handle->bitmap_start = get_start_bitmap(shm, max_num); 
+
+    hdr = (mz_shr_data_hdr_t *)handle->header_start; 
+
+    hdr->max_num = max_num; 
+    INIT_LIST_HEAD(&hdr->head);   
     
-    bm = get_start_bitmap(shr_mem, max_num); 
-    i = ((unsigned char *)node - shr_mem)/sizeof(mz_record_t); 
-
-    unset_bitmap(bm, i); 
-
-    return; 
+    return 0; 
 }  
 
-int tc_mem ()
+int 
+tc_destroy_memory_store(mz_mem_store_handle_t *handle) 
+{
+    // need to have a way to detash shared memory 
+    // TBD 
+
+    return 0; 
+} 
+
+void *tc_alloc_memory_record(mz_mem_store_handle_t *handle) 
+{
+    bitmap_t bm;
+    int i;
+
+    assert(handle); 
+    bm = handle->bitmap_start;
+    printf("nm address is %p %p \n", bm, 
+           handle->mem_start);
+    for (i = 0; i < handle->max_num; i++) {
+        if (get_bitmap(bm, i) == 0) {
+            set_bitmap(bm, i);
+            printf("return nodes at %d \n", i);
+            return handle->mem_start + sizeof(mz_record_t) * i;
+        }
+    }
+
+    return NULL; 
+} 
+
+
+void 
+tc_free_memory_record(mz_mem_store_handle_t *handle, 
+                      void *node) 
+{ 
+    bitmap_t bm;
+    int i;
+
+    assert(handle); 
+    bm = handle->bitmap_start;
+    i = ((unsigned char *)node - (unsigned char *) 
+         handle->mem_start) / sizeof(mz_record_t);
+
+    //TODO, remove from the list 
+    unset_bitmap(bm, i);
+ 
+    return; 
+} 
+
+struct list_head *
+tc_get_mem_head(mz_mem_store_handle_t *handle) 
+{
+    struct list_head *hdr = NULL; 
+    mz_shr_data_hdr_t *data_hdr = NULL; 
+ 
+    if (handle) { 
+        data_hdr = handle->header_start; 
+        hdr = &(data_hdr->head);
+    } 
+    
+    return hdr;          
+} 
+
+int tc_mem_test ()
 {
   char c;
   int shmid;
@@ -91,56 +192,28 @@ int tc_mem ()
   unsigned int mem_size; 
   mz_shr_data_hdr_t *hdr; 
   mz_record_t *node; 
+  mz_mem_store_handle_t hdl; 
    
-  mem_size = get_size_shr_mem_total(max_num); 
 
   /*
    * We'll name our shared memory segment
    * "5678".
    */
   key = 5678;
-  
-  /*
-   * Create the segment.
-   */
-  if ((shmid = shmget (key, mem_size, IPC_CREAT | 0666)) < 0)
-    {
-      perror ("shmget");
-      exit (1);
-    }
+  memset(&hdl, 0, sizeof(hdl)); 
 
-  /*
-   * Now we attach the segment to our data space.
-   */
-  if ((shm = shmat (shmid, NULL, 0)) == (char *) -1)
-    {
-      perror ("shmat");
-      exit (1);
-    }
+  if (0 != tc_create_memory_store(&hdl, 
+                                  max_num, 
+                                  key)) { 
+      perror("Error in creating mem store. \n"); 
+      exit(-1); 
+  } 
 
-  /*
-   * Now put some things into the memory for the
-   * other process to read.
-   */
-  memset(shm, 0, mem_size);
-  bzero(shm, mem_size); 
-
-  /*  
-  unsigned char *ch = (unsigned char *)shm; 
-  for (int i = 0; i < mem_size; i++) { 
-       printf("i value is %d mem_size %d %d\n", 
-              i, mem_size, ch[i]); 
-       assert(ch[i] == (unsigned char)0); 
-  } */ 
-            
-  hdr = (mz_shr_data_hdr_t *)get_start_shr_mem_header(shm, max_num); 
-  assert(hdr); 
-
-
-  hdr->max_num = max_num; 
-  INIT_LIST_HEAD(&hdr->head);   
-  printf("setting deadbeeft %p mem_size %d \n", 
-         hdr, mem_size); 
+  assert(hdl.max_num == max_num); 
+  assert(hdl.key == key); 
+        
+  printf("setting deadbeeft %d mem_size %d \n", 
+         hdl.max_num, mem_size); 
 
   node = (mz_record_t *)shm;     
   for (i = 0; i < max_num; i++) { 
@@ -150,13 +223,13 @@ int tc_mem ()
   } 
 
   for (i = 0; i < max_num; i++) { 
-      node = alloc_mz_node(shm, max_num); 
+      node = tc_alloc_memory_record(&hdl); 
       assert(node != NULL); 
       //assert(node->f1 == i); 
       //assert(node->f2 == i + 1);    
   } 
 
-  node = alloc_mz_node(shm, max_num); 
+  node = tc_alloc_memory_record(&hdl); 
   assert(node == NULL); 
  
   /*
@@ -174,34 +247,4 @@ int tc_mem ()
 
   exit (0);
 }
-
-int 
-tc_create_memory_store(mz_mem_store_handle_t *handle, 
-                           int max_num)
-{ 
- 
-    return 0; 
-}  
-
-int 
-tc_destroy_memory_store(mz_mem_store_handle_t *handle) 
-{ 
-
-    return 0; 
-} 
-
-void *tc_alloc_memory_record(mz_mem_store_handle_t *handle) 
-{ 
-
-    return NULL; 
-} 
-
-
-void tc_free_memory_record(mz_mem_store_handle_t *handle, 
-                           void *node) 
-{ 
-    return; 
-} 
-
-
 

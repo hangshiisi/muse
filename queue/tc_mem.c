@@ -9,8 +9,14 @@
 #include <assert.h> 
 #include <unistd.h> 
 #include <memory.h> 
+#include <signal.h> 
+
 
 #include "tc_mem.h" 
+
+
+static mz_mem_store_handle_t *g_tc_test_hdl = NULL; 
+
 
 static void 
 set_bitmap(bitmap_t b, int i) 
@@ -121,9 +127,18 @@ tc_create_memory_store(mz_mem_store_handle_t *handle,
 int 
 tc_destroy_memory_store(mz_mem_store_handle_t *handle) 
 {
-    // need to have a way to detash shared memory 
-    // TBD 
+    // need to have a way to detach shared memory 
+    assert(handle); 
+    if (shmdt(handle->mem_start) == -1) { 
+        perror("error in detach memory"); 
+        return -1; 
+    } 
 
+    if (shmctl(handle->shm_id, IPC_RMID, 0) == -1) { 
+        perror("error in free memory"); 
+        return -1; 
+    } 
+ 
     return 0; 
 } 
 
@@ -153,8 +168,8 @@ tc_alloc_memory_record(mz_mem_store_handle_t *handle)
     return start; 
 } 
 
-void *
-tc_get_memory_record(mz_mem_store_handle_t *handle, int index) 
+mz_record_t *
+tc_get_memory_record_by_index(mz_mem_store_handle_t *handle, int index) 
 {
     bitmap_t bm;
 
@@ -170,6 +185,53 @@ tc_get_memory_record(mz_mem_store_handle_t *handle, int index)
 
     return NULL; 
 } 
+
+mz_record_t *
+tc_get_memory_record_by_rule_num(mz_mem_store_handle_t *handle, int rule_num) 
+{
+
+    struct list_head *fo_list, *iter; 
+    mz_record_t *node = NULL; 
+
+    fo_list = tc_get_mem_head(handle); 
+
+    __list_for_each(iter, fo_list) { 
+        node = list_entry(iter, mz_record_t, list_member); 
+        assert(node != NULL); 
+        if (node->rule_num == rule_num) { 
+            return node; 
+        } 
+    } 
+
+  return node; 
+}
+
+
+
+int tc_walk_all_record(mz_mem_store_handle_t *handle, tc_walk_callback cb, 
+                       void *data)
+{ 
+    struct list_head *fo_list, *iter; 
+    mz_record_t *node = NULL; 
+    int rc = 0; 
+
+    fo_list = tc_get_mem_head(handle); 
+
+    __list_for_each(iter, fo_list) { 
+        node = list_entry(iter, mz_record_t, list_member); 
+        assert(node != NULL); 
+        
+        if (cb) { 
+            rc = cb(node, data); 
+            if (rc != 0) { 
+                 break; 
+            }
+        }
+    } 
+
+    return rc; 
+}
+
 
 void 
 tc_free_memory_record(mz_mem_store_handle_t *handle, 
@@ -189,6 +251,54 @@ tc_free_memory_record(mz_mem_store_handle_t *handle,
     return; 
 } 
 
+
+int 
+tc_attach_fo_to_record(mz_mem_store_handle_t *handle, 
+                       mz_record_t * node, 
+                       mz_fo_enum_e fo_type, 
+                       void *fo_data, 
+                       unsigned int len)
+{
+    if (handle == NULL || node == NULL) { 
+        return -1; //invalid argument 
+    }  
+
+    if (len != FO_DATA_SIZE) { 
+        return -1; //invalid argument 
+    }
+
+    memcpy(&(node->fo_data[fo_type]), fo_data, FO_DATA_SIZE); 
+
+    return 0; 
+}
+
+void *
+tc_get_fo_from_record(mz_mem_store_handle_t *handle, 
+                      mz_record_t *node, 
+                      mz_fo_enum_e fo_type)
+{ 
+
+    if (handle == NULL || node == NULL) { 
+        return NULL; //invalid argument 
+    }  
+
+    return &(node->fo_data[fo_type]); 
+}
+
+int 
+tc_detach_fo_from_record(mz_mem_store_handle_t *handle, 
+                         mz_record_t * node, 
+                         mz_fo_enum_e fo_type)
+{ 
+    if (handle == NULL || node == NULL) { 
+        return -1; //invalid argument 
+    }  
+
+    memset(&(node->fo_data[fo_type]), 0, FO_DATA_SIZE); 
+
+    return 0; 
+}
+
 struct list_head *
 tc_get_mem_head(mz_mem_store_handle_t *handle) 
 {
@@ -203,42 +313,61 @@ tc_get_mem_head(mz_mem_store_handle_t *handle)
     return hdr;          
 } 
 
+
+static void 
+tc_sig_handler(int sig) 
+{ 
+     printf("Got signal %d \n", sig); 
+     if (g_tc_test_hdl) { 
+         printf("Cleaning up tc memory store \n"); 
+         tc_destroy_memory_store(g_tc_test_hdl); 
+     }
+
+     exit(EXIT_SUCCESS); 
+}
+
+/* below function is test codes 
+ * to show function usages 
+ */ 
 int tc_mem_test ()
 {
-  int shmid;
-  key_t key;
-  char *shm;
-  int i = 0; 
+    int shmid;
+    key_t key;
+    char *shm;
+    int i = 0; 
  
-  unsigned int max_num = 1024; 
-  unsigned int mem_size = 0; 
-  mz_record_t *node = NULL; 
-  mz_mem_store_handle_t hdl = {0} ; 
-  struct list_head *fo_list, *iter;  
+    unsigned int max_num = 1024; 
+    mz_record_t *node = NULL; 
+    mz_mem_store_handle_t hdl = {0} ; 
+    struct list_head *fo_list, *iter;  
 
-  /*
-   * We'll name our shared memory segment
-   * "5678".
-   */
-  key = 5678;
-  memset(&hdl, 0, sizeof(hdl)); 
+    g_tc_test_hdl = &hdl; 
+    if (signal(SIGINT, tc_sig_handler) == SIG_ERR) { 
+        perror("Error setting signal handler"); 
+        exit(-1); 
+    }
 
-  if (0 != tc_create_memory_store(&hdl, 
-                                  max_num, 
-                                  key)) { 
-      perror("Error in creating mem store. \n"); 
-      exit(-1); 
-  } 
 
-  assert(hdl.max_num == max_num); 
-  assert(hdl.key == key); 
- 
+    /*
+     * We'll name our shared memory segment
+     * "5678".
+     */
+    key = 5678;
+    memset(&hdl, 0, sizeof(hdl)); 
+
+    if (0 != tc_create_memory_store(&hdl, 
+                                    max_num, 
+                                    key)) { 
+        perror("Error in creating mem store. \n"); 
+        exit(-1); 
+    } 
+
+    assert(hdl.max_num == max_num); 
+    assert(hdl.key == key); 
   
-  fo_list = tc_get_mem_head(&hdl); 
-
+    fo_list = tc_get_mem_head(&hdl); 
    
-  printf("setting deadbeeft %d mem_size %d \n", 
-         hdl.max_num, mem_size); 
+  printf("setting deadbeeft %d \n", hdl.max_num); 
 
   for (i = 0; i < max_num; i++) { 
       node = tc_alloc_memory_record(&hdl); 
@@ -254,7 +383,7 @@ int tc_mem_test ()
   assert(node == NULL); 
  
   for (i = 0; i < max_num; i++) { 
-      node = tc_get_memory_record(&hdl, i); 
+      node = tc_get_memory_record_by_index(&hdl, i); 
       assert(node != NULL); 
       assert(node->rule_num == i); 
       assert(node->queue_num == i + 1);    
@@ -282,6 +411,7 @@ int tc_mem_test ()
   } 
 
   printf("max is set to 0 right now, all done\n"); 
+  tc_destroy_memory_store(&hdl); 
 
   exit (0);
 }

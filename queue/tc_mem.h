@@ -15,8 +15,23 @@
 
 #include "list.h" 
 
-#define FO_NUM 			5 
-#define FO_DATA_SIZE 		32
+typedef enum { 
+    TC_FO_ENUM_MUSE    = 0, 
+    TC_FO_ENUM_FW      = 1, 
+    TC_FO_ENUM_OPERA   = 2, 
+    TC_FO_ENUM_OPENWRT = 3, 
+    TC_FO_ENUM_QOS     = 4, 
+    TC_FO_ENUM_MAX     = 5, 
+} mz_fo_enum_e; 
+
+#define FO_NUM                  TC_FO_ENUM_MAX
+#define FO_DATA_SIZE            32
+
+typedef enum { 
+    MZ_TC_MEM_MODE_RO = 0, 
+    MZ_TC_MEM_MODE_RW = 1, 
+} mz_tc_mem_mode_e; 
+
 typedef unsigned char* bitmap_t;
 
 typedef struct mz_fo_data_t_ { 
@@ -67,17 +82,64 @@ typedef struct mz_mem_store_handle_ {
     key_t key; //key for this shared memory 
 } mz_mem_store_handle_t; 
 
+
+/* 
+ * TC memory API 
+ */ 
+
+ /* Server Specific API */ 
 int tc_create_memory_store(mz_mem_store_handle_t *handle, 
                            int max_num, 
                            key_t key); 
 
 int tc_destroy_memory_store(mz_mem_store_handle_t *handle); 
 
+
 void *tc_alloc_memory_record(mz_mem_store_handle_t *handle); 
+
 void tc_free_memory_record(mz_mem_store_handle_t *handle, 
                            void *node); 
+/* Rule API */
+int tc_attach_fo_to_record(mz_mem_store_handle_t *handle, 
+                           mz_record_t *node, 
+                           mz_fo_enum_e fo_type, 
+                           void *fo_data, 
+                           unsigned int len); 
+
+void *tc_get_fo_from_record(mz_mem_store_handle_t *handle, 
+                            mz_record_t *node, 
+                            mz_fo_enum_e fo_type); 
+
+int tc_detach_fo_from_record(mz_mem_store_handle_t *handle, 
+                             mz_record_t *node, 
+                             mz_fo_enum_e fo_type); 
+
+
+
+/* Server or Client API */ 
 struct list_head *tc_get_mem_head(mz_mem_store_handle_t *handle); 
-void *tc_get_memory_record(mz_mem_store_handle_t *handle, int index); 
+
+mz_record_t *tc_get_memory_record_by_index(mz_mem_store_handle_t *handle, 
+                                           int index);
+
+mz_record_t *tc_get_memory_record_by_rule_num(mz_mem_store_handle_t *handle, 
+                                              int rule_num);
+
+typedef int (*tc_walk_callback)(mz_record_t *ndoe, void *data) ; 
+
+
+int tc_walk_all_record(mz_mem_store_handle_t *handle, tc_walk_callback cb, 
+                       void *data); 
+
+
+/* Client Specific API */ 
+int tc_open_memory_store(mz_mem_store_handle_t *handle, 
+                         key_t key); 
+
+int tc_close_memory_store(mz_mem_store_handle_t *handle, 
+                          key_t key); 
+
+
 
 #endif 
 

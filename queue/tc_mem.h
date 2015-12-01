@@ -45,7 +45,7 @@ typedef struct mz_record_t_
     int rule_num; //from orchestrator
     int queue_num;//from orchestrator, and L3/L4 classification 
     int app_info; // from DPI 
-    mz_fo_data_t fo_data[FO_NUM]; //feature opaque data 
+    mz_fo_data_t fo[FO_NUM]; //feature opaque data 
 } mz_record_t;
 
 /* 
@@ -125,7 +125,7 @@ mz_record_t *tc_get_memory_record_by_index(mz_mem_store_handle_t *handle,
 mz_record_t *tc_get_memory_record_by_rule_num(mz_mem_store_handle_t *handle, 
                                               int rule_num);
 
-typedef int (*tc_walk_callback)(mz_record_t *ndoe, void *data) ; 
+typedef int (*tc_walk_callback)(mz_record_t *ndoe, void *data); 
 
 
 int tc_walk_all_record(mz_mem_store_handle_t *handle, tc_walk_callback cb, 

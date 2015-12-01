@@ -267,7 +267,7 @@ tc_attach_fo_to_record(mz_mem_store_handle_t *handle,
         return -1; //invalid argument 
     }
 
-    memcpy(&(node->fo_data[fo_type]), fo_data, FO_DATA_SIZE); 
+    memcpy(&(node->fo[fo_type].fo_data), fo_data, FO_DATA_SIZE); 
 
     return 0; 
 }
@@ -282,7 +282,7 @@ tc_get_fo_from_record(mz_mem_store_handle_t *handle,
         return NULL; //invalid argument 
     }  
 
-    return &(node->fo_data[fo_type]); 
+    return &(node->fo[fo_type].fo_data); 
 }
 
 int 
@@ -294,7 +294,7 @@ tc_detach_fo_from_record(mz_mem_store_handle_t *handle,
         return -1; //invalid argument 
     }  
 
-    memset(&(node->fo_data[fo_type]), 0, FO_DATA_SIZE); 
+    memset(&(node->fo[fo_type].fo_data), 0, FO_DATA_SIZE); 
 
     return 0; 
 }
@@ -326,6 +326,32 @@ tc_sig_handler(int sig)
      exit(EXIT_SUCCESS); 
 }
 
+
+int tc_test_walk_cb (mz_record_t *node, void *data)
+{
+    int i = 0; 
+    unsigned char fo_data[FO_DATA_SIZE]; 
+
+    if (node == NULL) { 
+        return 0; 
+    }
+
+    if (node->rule_num == 0) { 
+        return 0; //not allocated or used 
+    }
+
+    memset(fo_data, 0, FO_DATA_SIZE); 
+    for (i = TC_FO_ENUM_MUSE; i < TC_FO_ENUM_MAX; i++) { 
+        if (memcmp(fo_data, &(node->fo[i].fo_data), FO_DATA_SIZE) != 0) { 
+            printf(" Node rule %d queue %d fo %d \n", 
+                   node->rule_num, node->queue_num, 
+                   i); 
+        }
+    } 
+
+    return 0; 
+}
+
 /* below function is test codes 
  * to show function usages 
  */ 
@@ -340,7 +366,11 @@ int tc_mem_test ()
     mz_record_t *node = NULL; 
     mz_mem_store_handle_t hdl = {0} ; 
     struct list_head *fo_list, *iter;  
+    unsigned char fo_data[FO_DATA_SIZE]; 
+    unsigned char *data; 
 
+
+    memset(fo_data, 0, sizeof(FO_DATA_SIZE)); 
     g_tc_test_hdl = &hdl; 
     if (signal(SIGINT, tc_sig_handler) == SIG_ERR) { 
         perror("Error setting signal handler"); 
@@ -367,16 +397,16 @@ int tc_mem_test ()
   
     fo_list = tc_get_mem_head(&hdl); 
    
-  printf("setting deadbeeft %d \n", hdl.max_num); 
+    printf("setting deadbeeft %d \n", hdl.max_num); 
 
-  for (i = 0; i < max_num; i++) { 
-      node = tc_alloc_memory_record(&hdl); 
-      assert(node != NULL); 
-      node->rule_num = i; 
-      node->queue_num = i + 1;    
-      node->app_info = i + 2;    
-      INIT_LIST_HEAD(&node->list_member);
-      list_add(&node->list_member, fo_list);    
+    for (i = 0; i < max_num; i++) { 
+        node = tc_alloc_memory_record(&hdl); 
+        assert(node != NULL); 
+        node->rule_num = i; 
+        node->queue_num = i + 1;    
+        node->app_info = i + 2;    
+        INIT_LIST_HEAD(&node->list_member);
+        list_add(&node->list_member, fo_list);    
   } 
 
   node = tc_alloc_memory_record(&hdl); 
@@ -397,6 +427,55 @@ int tc_mem_test ()
       assert(node->queue_num == node->rule_num + 1); 
       assert(node->app_info == node->rule_num + 2);   
   } 
+   
+  
+  
+  node = tc_get_memory_record_by_index(&hdl, 10); 
+  memset(fo_data, 0, sizeof(FO_DATA_SIZE)); 
+  fo_data[0] = 0x11; 
+  tc_attach_fo_to_record(&hdl, node, TC_FO_ENUM_FW, 
+                         fo_data, FO_DATA_SIZE); 
+
+  node = tc_get_memory_record_by_index(&hdl, 20); 
+  memset(fo_data, 0, sizeof(FO_DATA_SIZE)); 
+  fo_data[0] = 0x22; 
+  tc_attach_fo_to_record(&hdl, node, TC_FO_ENUM_QOS, 
+                         fo_data, FO_DATA_SIZE); 
+
+  node = tc_get_memory_record_by_rule_num(&hdl, 30); 
+  memset(fo_data, 0, sizeof(FO_DATA_SIZE)); 
+  fo_data[0] = 0x33; 
+  tc_attach_fo_to_record(&hdl, node, TC_FO_ENUM_MUSE, 
+                         fo_data, FO_DATA_SIZE); 
+
+
+  tc_walk_all_record(&hdl, tc_test_walk_cb, NULL); 
+
+  printf("Now detach one FO\n"); 
+  node = tc_get_memory_record_by_index(&hdl, 20); 
+  tc_detach_fo_from_record(&hdl, node, TC_FO_ENUM_QOS); 
+
+  tc_walk_all_record(&hdl, tc_test_walk_cb, NULL); 
+
+  printf("Now searching FO\n"); 
+  node = tc_get_memory_record_by_rule_num(&hdl, 30); 
+  memset(fo_data, 0, sizeof(FO_DATA_SIZE)); 
+  fo_data[0] = 0x33; 
+  data = tc_get_fo_from_record(&hdl, node, TC_FO_ENUM_MUSE); 
+
+  if (node->fo[TC_FO_ENUM_MUSE].fo_data[0] == 0x33) { 
+      printf(" Correct! Node rule %d queue %d\n", 
+             node->rule_num, node->queue_num); 
+  } else { 
+      printf(" Error in FO DB data \n"); 
+  }
+
+  if (memcmp(fo_data, data, FO_DATA_SIZE) == 0) { 
+      printf(" Correct Retrived Node rule %d queue %d\n", 
+             node->rule_num, node->queue_num); 
+  } else { 
+      printf(" Error in searching FO data \n"); 
+  }
 
 
   /*
